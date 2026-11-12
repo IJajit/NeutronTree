@@ -1,4 +1,4 @@
-import { BlockNode } from '../types/canvas';
+import { BlockNode, Category } from '../types/canvas';
 
 declare global {
   interface Window {
@@ -137,6 +137,95 @@ export function requestGoogleDriveAuth(clientId: string): Promise<string> {
       reject(err);
     }
   });
+}
+
+/**
+ * Board state sync bundle interface
+ */
+export interface CloudBoardSyncBundle {
+  categories: Category[];
+  viewport: { x: number; y: number; zoom: number };
+  activeCategory: string;
+  updatedAt: number;
+}
+
+/**
+ * Syncs the global board state (categories hierarchy + positions) to Google Drive
+ */
+export async function syncBoardStateToDrive(bundle: CloudBoardSyncBundle): Promise<void> {
+  const token = getStoredAccessToken();
+  if (!token) return;
+
+  try {
+    const rootFolderId = await getOrCreateDriveFolder('NeuronTree');
+    const fileName = 'neuron_tree_board_meta.json';
+    const content = JSON.stringify(bundle, null, 2);
+
+    const searchRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+        `name = '${fileName}' and '${rootFolderId}' in parents and trashed = false`
+      )}&fields=files(id)`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const searchData = await searchRes.json();
+    const existingId = searchData.files?.[0]?.id;
+
+    if (existingId) {
+      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=media`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: content,
+      });
+    } else {
+      const form = new FormData();
+      form.append(
+        'metadata',
+        new Blob([JSON.stringify({ name: fileName, mimeType: 'application/json', parents: [rootFolderId] })], {
+          type: 'application/json; charset=UTF-8',
+        })
+      );
+      form.append('file', new Blob([content], { type: 'application/json' }), fileName);
+      await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+    }
+  } catch (err) {
+    console.warn('Error saving board state to Drive:', err);
+  }
+}
+
+/**
+ * Pulls the global board state (categories hierarchy + positions) from Google Drive
+ */
+export async function pullBoardStateFromDrive(): Promise<CloudBoardSyncBundle | null> {
+  const token = getStoredAccessToken();
+  if (!token) return null;
+
+  try {
+    const rootFolderId = await getOrCreateDriveFolder('NeuronTree');
+    const searchRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+        `name = 'neuron_tree_board_meta.json' and '${rootFolderId}' in parents and trashed = false`
+      )}&fields=files(id)`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const searchData = await searchRes.json();
+    const fileId = searchData.files?.[0]?.id;
+    if (fileId) {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        return (await res.json()) as CloudBoardSyncBundle;
+      }
+    }
+    return null;
+  } catch (err) {
+    console.warn('Error pulling board state from Drive:', err);
+    return null;
+  }
 }
 
 /**

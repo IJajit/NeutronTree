@@ -15,6 +15,8 @@ import {
   trashNodeOnGoogleDrive,
   handleOAuthRedirectResponse,
   pullNodesFromGoogleDrive,
+  syncBoardStateToDrive,
+  pullBoardStateFromDrive,
 } from '@/lib/drive/googleDrive';
 
 export default function Home() {
@@ -82,56 +84,85 @@ export default function Home() {
       const isConnected = connectedFromRedirect || Boolean(getStoredAccessToken());
       setIsDriveConnected(isConnected);
 
-      // If Google Drive is connected, pull all real cloud cards from Google Drive
+      // If Google Drive is connected, pull all real cloud cards and sync board arrangement
       if (isConnected) {
         try {
-          const driveNodes = await pullNodesFromGoogleDrive();
+          const [driveNodes, cloudMeta] = await Promise.all([
+            pullNodesFromGoogleDrive(),
+            pullBoardStateFromDrive(),
+          ]);
+
           if (driveNodes.length > 0) {
-            // Merge with local nodes
+            // Remove local stock demo nodes if we have authentic drive cards
+            await db.nodes.clear();
             for (const dNode of driveNodes) {
               await db.nodes.put(dNode);
             }
             const updatedNodes = await db.nodes.toArray();
             setNodes(updatedNodes);
           }
+
+          if (cloudMeta) {
+            if (cloudMeta.categories && cloudMeta.categories.length > 0) {
+              await db.categories.clear();
+              for (const c of cloudMeta.categories) {
+                await db.categories.put(c);
+              }
+              setCategories(cloudMeta.categories);
+            }
+            if (cloudMeta.viewport) {
+              setViewport(cloudMeta.viewport);
+            }
+            if (cloudMeta.activeCategory) {
+              setActiveCategory(cloudMeta.activeCategory);
+            }
+          }
         } catch (e) {
           console.warn('Drive pull error:', e);
         }
-      }
+      } else {
+        // Auto-heal: Ensure all nodes reference an existing category, else migrate to 'general'
+        const catIdSet = new Set(allCats.map((c) => c.id));
+        const healedNodes = await Promise.all(
+          allNodes.map(async (n) => {
+            if (n.category !== 'general' && !catIdSet.has(n.category)) {
+              await db.nodes.update(n.id, { category: 'general', updatedAt: Date.now() });
+              return { ...n, category: 'general' };
+            }
+            return n;
+          })
+        );
 
-      // Auto-heal: Ensure all nodes reference an existing category, else migrate to 'general'
-      const catIdSet = new Set(allCats.map((c) => c.id));
-      const healedNodes = await Promise.all(
-        allNodes.map(async (n) => {
-          if (n.category !== 'general' && !catIdSet.has(n.category)) {
-            await db.nodes.update(n.id, { category: 'general', updatedAt: Date.now() });
-            return { ...n, category: 'general' };
-          }
-          return n;
-        })
-      );
-
-      setCategories(allCats);
-      setNodes(healedNodes);
-      if (savedBoard) {
-        setViewport(savedBoard.viewport);
-        setActiveCategory(catIdSet.has(savedBoard.activeCategory) ? savedBoard.activeCategory : 'all');
+        setCategories(allCats);
+        setNodes(healedNodes);
+        if (savedBoard) {
+          setViewport(savedBoard.viewport);
+          setActiveCategory(catIdSet.has(savedBoard.activeCategory) ? savedBoard.activeCategory : 'all');
+        }
       }
     }
     loadData();
   }, []);
 
-  // Save Viewport to DB
+  // Save Viewport & Categories to DB and Cloud Drive
   useEffect(() => {
     const timer = setTimeout(async () => {
       try {
         await db.boardState.update('main', { viewport, activeCategory });
+        if (isDriveConnected && categories.length > 0) {
+          syncBoardStateToDrive({
+            categories,
+            viewport,
+            activeCategory,
+            updatedAt: Date.now(),
+          });
+        }
       } catch {
         // Ignore
       }
-    }, 500);
+    }, 1000);
     return () => clearTimeout(timer);
-  }, [viewport, activeCategory]);
+  }, [viewport, activeCategory, categories, isDriveConnected]);
 
   // Global Clipboard Paste Handler
   useEffect(() => {

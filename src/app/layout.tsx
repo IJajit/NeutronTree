@@ -5,6 +5,12 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Neuron Tree",
   description: "Personal Second Brain & Inspiration Infinite Canvas",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Neuron Tree",
+  },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },

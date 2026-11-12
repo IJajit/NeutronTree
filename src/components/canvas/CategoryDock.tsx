@@ -267,8 +267,8 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
       <nav
         className="glass-dock-bar"
         style={{
-          padding: '6px 8px',
-          gap: '6px',
+          padding: '6px 14px',
+          gap: '8px',
         }}
       >
         {/* Manage Categories Popover Button */}
