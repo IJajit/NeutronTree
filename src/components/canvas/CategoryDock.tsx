@@ -161,7 +161,16 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
           </div>
 
           {/* Add Category / Subcategory Form */}
-          <form onSubmit={handleCreateCategory} style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
+          <form
+            onSubmit={handleCreateCategory}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+              paddingTop: '12px',
+              borderTop: '1px solid var(--border)',
+            }}
+          >
             <div style={{ display: 'flex', gap: '6px' }}>
               <input
                 type="text"
@@ -170,11 +179,11 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
                 placeholder="Category name..."
                 style={{
                   flex: 1,
-                  fontSize: '12px',
-                  backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                  fontSize: '13px',
+                  backgroundColor: 'var(--input-bg)',
                   border: '1px solid var(--border)',
                   borderRadius: '10px',
-                  padding: '7px 12px',
+                  padding: '8px 12px',
                   color: 'var(--text-main)',
                   outline: 'none',
                 }}
@@ -182,14 +191,15 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
               <button
                 type="submit"
                 style={{
-                  padding: '7px 14px',
+                  padding: '8px 16px',
                   backgroundColor: 'var(--liverpool)',
                   color: '#fff',
                   borderRadius: '10px',
                   border: 'none',
                   cursor: 'pointer',
-                  fontSize: '11px',
+                  fontSize: '12px',
                   fontWeight: 600,
+                  boxShadow: '0 0 12px var(--liverpool-glow)',
                 }}
               >
                 Add
@@ -197,29 +207,57 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
             </div>
 
             {/* Parent Category Selector */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Nest under:</span>
-              <select
-                value={selectedParentId}
-                onChange={(e) => setSelectedParentId(e.target.value)}
-                style={{
-                  flex: 1,
-                  backgroundColor: 'rgba(0, 0, 0, 0.3)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '8px',
-                  padding: '4px 8px',
-                  fontSize: '11px',
-                  color: 'var(--text-main)',
-                  outline: 'none',
-                }}
-              >
-                <option value="">None (Top-Level Category)</option>
-                {topCategories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>
+                Nest under (Optional Parent):
+              </span>
+              <div style={{ position: 'relative', width: '100%' }}>
+                <select
+                  value={selectedParentId}
+                  onChange={(e) => setSelectedParentId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    backgroundColor: 'var(--input-bg)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '10px',
+                    padding: '8px 36px 8px 12px',
+                    fontSize: '12px',
+                    color: 'var(--text-main)',
+                    outline: 'none',
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <option value="" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-main)' }}>
+                    None (Top-Level Category)
                   </option>
-                ))}
-              </select>
+                  {topCategories.map((c) => (
+                    <option key={c.id} value={c.id} style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-main)' }}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Custom Chevron Arrow positioned 14px inside right edge */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    right: '14px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </div>
+              </div>
             </div>
           </form>
         </div>
@@ -250,28 +288,35 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
           <span>All</span>
         </button>
 
-        {/* Top-Level Categories with Hover / Touch Subcategory flyouts */}
+        {/* Top-Level Categories with Click / Hover Subcategory flyouts */}
         <div className="flex items-center gap-1.5 overflow-x-auto max-w-[48vw] no-native-scrollbar py-0.5">
           {topCategories.map((cat) => {
             const subs = getSubcategories(cat.id);
             const isTopActive = activeCategory === cat.id;
             const hasActiveSub = subs.some((s) => s.id === activeCategory);
-            const isHovered = hoveredCatId === cat.id;
+            const isFlyoutOpen = hoveredCatId === cat.id;
 
             return (
               <div
                 key={cat.id}
                 className="relative"
-                onMouseEnter={() => setHoveredCatId(cat.id)}
+                onMouseEnter={() => {
+                  if (subs.length > 0) setHoveredCatId(cat.id);
+                }}
                 onMouseLeave={() => setHoveredCatId(null)}
               >
                 <button
-                  onClick={() => onSelectCategory(cat.id)}
+                  onClick={() => {
+                    onSelectCategory(cat.id);
+                    if (subs.length > 0) {
+                      setHoveredCatId((prev) => (prev === cat.id ? null : cat.id));
+                    }
+                  }}
                   className={`filter-pill relative touch-manipulation min-h-[36px] ${isTopActive || hasActiveSub ? 'active' : ''}`}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px',
+                    gap: '5px',
                   }}
                 >
                   <span>{cat.name}</span>
@@ -279,10 +324,11 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
                     <span
                       style={{
                         fontSize: '9px',
-                        padding: '1px 5px',
+                        padding: '1px 6px',
                         borderRadius: '9999px',
-                        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                        marginLeft: '2px',
+                        backgroundColor: 'var(--border)',
+                        color: 'var(--text-main)',
+                        fontWeight: 600,
                       }}
                     >
                       {subs.length}
@@ -290,24 +336,24 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
                   )}
                 </button>
 
-                {/* Subcategory Hover Flyout Menu */}
-                {subs.length > 0 && isHovered && (
+                {/* Subcategory Flyout Menu with consistent background */}
+                {subs.length > 0 && isFlyoutOpen && (
                   <div
                     style={{
                       position: 'absolute',
-                      bottom: 'calc(100% + 8px)',
+                      bottom: 'calc(100% + 10px)',
                       left: '50%',
                       transform: 'translateX(-50%)',
-                      backgroundColor: 'var(--card-bg, rgba(16, 16, 16, 0.96))',
-                      backdropFilter: 'blur(20px)',
+                      backgroundColor: 'var(--glass-bg)',
+                      backdropFilter: 'blur(28px) saturate(190%)',
                       border: '1px solid var(--border)',
-                      borderRadius: '14px',
-                      padding: '6px',
-                      boxShadow: '0 12px 30px rgba(0, 0, 0, 0.8)',
+                      borderRadius: '16px',
+                      padding: '8px',
+                      boxShadow: '0 16px 36px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '4px',
-                      minWidth: '130px',
+                      minWidth: '150px',
                       zIndex: 150,
                     }}
                   >
@@ -315,14 +361,42 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
                       style={{
                         fontSize: '10px',
                         textTransform: 'uppercase',
-                        letterSpacing: '0.04em',
+                        letterSpacing: '0.05em',
                         color: 'var(--text-muted)',
-                        padding: '2px 8px',
+                        padding: '4px 8px',
                         fontWeight: 600,
+                        borderBottom: '1px solid var(--border-subtle)',
+                        marginBottom: '2px',
                       }}
                     >
-                      {cat.name} Subcategories
+                      {cat.name}
                     </div>
+
+                    {/* Quick option to select all in this category */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectCategory(cat.id);
+                        setHoveredCatId(null);
+                      }}
+                      style={{
+                        textAlign: 'left',
+                        padding: '6px 10px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        backgroundColor: activeCategory === cat.id ? 'var(--liverpool)' : 'transparent',
+                        color: activeCategory === cat.id ? '#ffffff' : 'var(--text-main)',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <span>All {cat.name}</span>
+                    </button>
+
                     {subs.map((sub) => (
                       <button
                         key={sub.id}
@@ -345,7 +419,7 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
                           gap: '6px',
                         }}
                       >
-                        <CornerDownRight className="w-3 h-3 opacity-60" />
+                        <CornerDownRight className="w-3.5 h-3.5 opacity-60" />
                         <span>{sub.name}</span>
                       </button>
                     ))}

@@ -566,7 +566,16 @@ export default function Home() {
         }}
       >
         {nodes.map((node) => {
-          const isCategoryMatch = activeCategory === 'all' || node.category === activeCategory;
+          // Check if matches activeCategory directly, OR matches a subcategory of activeCategory
+          const isCategoryMatch = (() => {
+            if (activeCategory === 'all') return true;
+            if (node.category === activeCategory) return true;
+            // If activeCategory is a parent category, show all nodes belonging to any of its subcategories as well!
+            const nodeCat = categories.find((c) => c.id === node.category);
+            if (nodeCat && nodeCat.parentId === activeCategory) return true;
+            return false;
+          })();
+
           const isSelected = selectedNodeId === node.id;
           return (
             <div
