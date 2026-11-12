@@ -1,0 +1,232 @@
+@import "https://fonts.cdnfonts.com/css/neue-haas-grotesk-display-pro";
+@import "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap";
+@import "tailwindcss";
+
+:root {
+  --background: #080808;
+  --foreground: #f4f4f5;
+  --surface: #111111;
+  --surface-hover: #161616;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --glass-bg: rgba(14, 14, 14, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-circle-bg: rgba(255, 255, 255, 0.04);
+  --glass-circle-hover: rgba(255, 255, 255, 0.10);
+  --card-bg: #111111;
+  --card-border: rgba(255, 255, 255, 0.08);
+  --card-footer-bg: rgba(0, 0, 0, 0.35);
+  --card-shadow: 0 12px 32px -4px rgba(0,0,0,0.6), 0 4px 12px rgba(0,0,0,0.4);
+  --text-muted: #888888;
+  --text-main: #ffffff;
+  --text-sub: #cccccc;
+  --input-bg: rgba(0, 0, 0, 0.6);
+  --dot-color: rgba(255, 255, 255, 0.14);
+  
+  /* Liverpool Red Tokens */
+  --liverpool: #C8102E;
+  --liverpool-dark: #8B0A1E;
+  --liverpool-glow: rgba(200, 16, 46, 0.35);
+  --liverpool-subtle: rgba(200, 16, 46, 0.12);
+
+  /* Typography: Neue Haas Grotesk web font with comprehensive fallbacks */
+  --font-haas: "Neue Haas Grotesk Display Pro", "Neue Haas Grotesk Text Pro", "Neue Haas Grotesk", "Helvetica Neue", -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+}
+
+/* Light Theme Tokens */
+[data-theme="light"] {
+  --background: #f7f7f8;
+  --foreground: #111111;
+  --surface: #ffffff;
+  --surface-hover: #f0f0f2;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-subtle: rgba(0, 0, 0, 0.04);
+  --glass-bg: rgba(255, 255, 255, 0.90);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-circle-bg: rgba(0, 0, 0, 0.04);
+  --glass-circle-hover: rgba(0, 0, 0, 0.08);
+  --card-bg: #ffffff;
+  --card-border: rgba(0, 0, 0, 0.08);
+  --card-footer-bg: rgba(0, 0, 0, 0.03);
+  --card-shadow: 0 10px 25px -4px rgba(0, 0, 0, 0.06), 0 4px 10px rgba(0, 0, 0, 0.03);
+  --text-muted: #666666;
+  --text-main: #111111;
+  --text-sub: #444444;
+  --input-bg: #f3f3f5;
+  --dot-color: rgba(0, 0, 0, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-haas) !important;
+  letter-spacing: 0.015em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Glass Dock Container pinned to bottom center */
+.glass-dock-container {
+  z-index: 90;
+  box-sizing: border-box;
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 1.5rem;
+  max-width: calc(100vw - 2rem);
+}
+
+.glass-dock-bar {
+  -webkit-backdrop-filter: blur(28px) saturate(190%) brightness(105%);
+  backdrop-filter: blur(28px) saturate(190%) brightness(105%);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 9999px;
+  justify-content: center;
+  align-items: center;
+  padding: 6px;
+  gap: 6px;
+  display: flex;
+  position: relative;
+  box-shadow: 0 20px 45px -8px rgba(0, 0, 0, 0.4), 0 8px 18px -3px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+/* Circular icon action buttons in dock */
+.glass-circle-btn {
+  cursor: pointer;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--glass-circle-bg);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+}
+
+.glass-circle-btn:hover {
+  background: var(--glass-circle-hover);
+  border-color: var(--border);
+  color: var(--text-main);
+  transform: scale(1.04);
+}
+
+.glass-circle-btn.primary {
+  background: var(--liverpool);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 0 14px var(--liverpool-glow);
+}
+
+.glass-circle-btn.primary:hover {
+  background: #d81233;
+}
+
+/* Card Container Stacking & Smooth Hover Physics */
+.card-container-wrapper {
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+  will-change: transform, box-shadow;
+}
+
+.card-container-wrapper:hover {
+  z-index: 25 !important;
+  transform: translateY(-4px) scale(1.008);
+}
+
+.card-container-wrapper:hover .card-body-shell {
+  box-shadow: 0 24px 50px -10px rgba(0, 0, 0, 0.65), 0 10px 20px -5px rgba(0, 0, 0, 0.4) !important;
+}
+
+[data-theme="light"] .card-container-wrapper:hover .card-body-shell {
+  box-shadow: 0 20px 45px -8px rgba(0, 0, 0, 0.14), 0 8px 16px -4px rgba(0, 0, 0, 0.08) !important;
+}
+.filter-pill {
+  color: var(--text-muted);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  flex-shrink: 0;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.015em;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.filter-pill:hover {
+  color: var(--text-main);
+  background: var(--glass-circle-hover);
+}
+
+.filter-pill.active {
+  color: var(--text-main) !important;
+  background: var(--glass-circle-bg) !important;
+  font-weight: 700 !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Custom 2px Minimal Hairline Scrollbar */
+::-webkit-scrollbar {
+  width: 2px;
+  height: 2px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+  transition: background-color 0.2s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--liverpool);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.no-native-scrollbar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.no-native-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Completely suppress Next.js dev indicators */
+[data-nextjs-dev-tools-button],
+nextjs-portal,
+#nextjs-dev-tools,
+div[class*="next-devtools"],
+next-route-announcer {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
