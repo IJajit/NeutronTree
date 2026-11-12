@@ -63,28 +63,46 @@ export async function requestGoogleDriveAuth(clientId: string): Promise<string> 
   }
 
   return new Promise((resolve, reject) => {
+    let resolved = false;
+
     try {
       tokenClient = window.google.accounts.oauth2.initTokenClient({
         client_id: clientId.trim(),
         scope: DRIVE_FILE_SCOPE,
         callback: (response: any) => {
+          if (resolved) return;
           if (response.error) {
+            resolved = true;
             reject(new Error(response.error_description || response.error));
             return;
           }
           if (response.access_token) {
+            resolved = true;
             setStoredAccessToken(response.access_token);
             resolve(response.access_token);
           } else {
+            resolved = true;
             reject(new Error('No access token received from Google.'));
           }
         },
         error_callback: (err: any) => {
+          console.warn('GIS error_callback received:', err);
+          if (resolved) return;
           if (err?.type === 'popup_failed_to_open') {
+            resolved = true;
             reject(new Error('Popup blocked! Please allow popups for https://neutrontree.vercel.app in your browser address bar.'));
           } else if (err?.type === 'popup_closed') {
-            reject(new Error('Sign-in cancelled. Popup was closed before authorization.'));
+            // NOTE: Google GIS often emits popup_closed prematurely when navigating between intermediate
+            // warning/consent pages like "Google hasn't verified this app".
+            // Give the user a grace period to complete consent before assuming it was actually cancelled.
+            setTimeout(() => {
+              if (!resolved && !getStoredAccessToken()) {
+                resolved = true;
+                reject(new Error('Sign-in cancelled or popup closed before completing authorization.'));
+              }
+            }, 3000);
           } else {
+            resolved = true;
             reject(new Error(err?.message || 'Google authorization window encountered an error.'));
           }
         },
