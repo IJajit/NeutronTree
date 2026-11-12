@@ -262,14 +262,35 @@ export async function syncNodeToGoogleDrive(node: BlockNode): Promise<string | n
     // 1. Upload the real, accessible user asset (Images, PDFs, Links, Markdown Notes)
     const cleanTitle = (node.data.title || node.id).replace(/[\\/:*?"<>|]/g, '_').trim();
 
-    if (node.type === 'image' && node.data.thumbnailUrl?.startsWith('data:')) {
-      const imgBlob = dataUrlToBlob(node.data.thumbnailUrl, node.data.mimeType || 'image/png');
+    if (node.type === 'image') {
+      let imgBlob: Blob | null = null;
       const imgExt = (node.data.mimeType || 'image/png').split('/')[1] || 'png';
       const userFileName = node.data.fileName || `${cleanTitle}.${imgExt}`;
-      await uploadMediaFileToDrive(userFileName, node.data.mimeType || 'image/png', imgBlob, categoryFolderId, token);
-    } else if (node.type === 'document' && node.data.rawFileBase64?.startsWith('data:')) {
-      const docBlob = dataUrlToBlob(node.data.rawFileBase64, node.data.mimeType || 'application/pdf');
+
+      if (node.data.thumbnailUrl?.startsWith('data:')) {
+        imgBlob = dataUrlToBlob(node.data.thumbnailUrl, node.data.mimeType || 'image/png');
+      } else if (node.data.thumbnailUrl?.startsWith('http')) {
+        try {
+          const fetchImg = await fetch(node.data.thumbnailUrl);
+          if (fetchImg.ok) {
+            imgBlob = await fetchImg.blob();
+          }
+        } catch (e) {
+          console.warn('Could not fetch external image directly:', e);
+        }
+      }
+
+      if (imgBlob) {
+        await uploadMediaFileToDrive(userFileName, node.data.mimeType || 'image/png', imgBlob, categoryFolderId, token);
+      }
+    } else if (node.type === 'document') {
       const userFileName = node.data.fileName || `${cleanTitle}.pdf`;
+      let docBlob: Blob | null = null;
+      if (node.data.rawFileBase64?.startsWith('data:')) {
+        docBlob = dataUrlToBlob(node.data.rawFileBase64, node.data.mimeType || 'application/pdf');
+      } else {
+        docBlob = new Blob([node.data.description || ''], { type: 'text/plain' });
+      }
       await uploadMediaFileToDrive(userFileName, node.data.mimeType || 'application/pdf', docBlob, categoryFolderId, token);
     } else if (node.type === 'link' && node.data.url) {
       // Create clickable Internet Shortcut (.url file) that directly opens in browsers
