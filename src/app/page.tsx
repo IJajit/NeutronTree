@@ -101,6 +101,9 @@ export default function Home() {
             }
             const updatedNodes = await db.nodes.toArray();
             setNodes(updatedNodes);
+            centerCanvasOnNodes(updatedNodes);
+          } else if (allNodes.length > 0) {
+            centerCanvasOnNodes(allNodes);
           }
 
           if (cloudMeta) {
@@ -110,9 +113,6 @@ export default function Home() {
                 await db.categories.put(c);
               }
               setCategories(cloudMeta.categories);
-            }
-            if (cloudMeta.viewport) {
-              setViewport(cloudMeta.viewport);
             }
             if (cloudMeta.activeCategory) {
               setActiveCategory(cloudMeta.activeCategory);
@@ -136,8 +136,12 @@ export default function Home() {
 
         setCategories(allCats);
         setNodes(healedNodes);
-        if (savedBoard) {
+        if (healedNodes.length > 0) {
+          centerCanvasOnNodes(healedNodes);
+        } else if (savedBoard) {
           setViewport(savedBoard.viewport);
+        }
+        if (savedBoard) {
           setActiveCategory(catIdSet.has(savedBoard.activeCategory) ? savedBoard.activeCategory : 'all');
         }
       }
@@ -297,7 +301,9 @@ export default function Home() {
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 1) {
       const touch = e.touches[0];
-      if (e.target === canvasRef.current) {
+      const target = e.target as HTMLElement | null;
+      // Pan if touching the canvas background or the dot matrix grid layer
+      if (!target || target === canvasRef.current || target.classList.contains('canvas-bg-grid')) {
         setSelectedNodeId(null);
         setIsPanning(true);
         panStartRef.current = { x: touch.clientX - viewport.x, y: touch.clientY - viewport.y };
@@ -373,7 +379,13 @@ export default function Home() {
 
   // Mouse Pan Handlers
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.target === canvasRef.current || e.button === 1 || e.shiftKey) {
+    const target = e.target as HTMLElement | null;
+    if (
+      target === canvasRef.current ||
+      target?.classList.contains('canvas-bg-grid') ||
+      e.button === 1 ||
+      e.shiftKey
+    ) {
       setSelectedNodeId(null);
       setIsPanning(true);
       panStartRef.current = { x: e.clientX - viewport.x, y: e.clientY - viewport.y };
@@ -411,15 +423,43 @@ export default function Home() {
     setIsPanning(false);
   };
 
+  // Centers viewport so all nodes are comfortably visible on screen
+  const centerCanvasOnNodes = (items: BlockNode[]) => {
+    if (typeof window === 'undefined' || items.length === 0) return;
+    const minX = Math.min(...items.map((n) => n.x));
+    const maxX = Math.max(...items.map((n) => n.x + (n.width || 340)));
+    const minY = Math.min(...items.map((n) => n.y));
+    const maxY = Math.max(...items.map((n) => n.y + (n.height || 260)));
+
+    const contentWidth = Math.max(maxX - minX, 100);
+    const contentHeight = Math.max(maxY - minY, 100);
+    const centerX = minX + contentWidth / 2;
+    const centerY = minY + contentHeight / 2;
+
+    const screenW = window.innerWidth;
+    const screenH = window.innerHeight;
+
+    // On mobile screens, choose a zoom level that frames the content without getting lost
+    const isMobile = screenW < 768;
+    const padding = isMobile ? 60 : 120;
+    const fitZoom = Math.min(
+      (screenW - padding) / contentWidth,
+      (screenH - padding) / contentHeight
+    );
+    const initialZoom = isMobile
+      ? Math.max(0.35, Math.min(fitZoom, 0.75))
+      : Math.max(0.4, Math.min(fitZoom, 1.0));
+
+    setViewport({
+      x: screenW / 2 - centerX * initialZoom,
+      y: screenH / 2 - centerY * initialZoom,
+      zoom: Number(initialZoom.toFixed(2)),
+    });
+  };
+
   const handleResetTo100 = () => {
     if (nodes.length > 0) {
-      const avgX = nodes.reduce((acc, curr) => acc + curr.x + (curr.width || 360) / 2, 0) / nodes.length;
-      const avgY = nodes.reduce((acc, curr) => acc + curr.y + (curr.height || 260) / 2, 0) / nodes.length;
-      setViewport({
-        x: window.innerWidth / 2 - avgX * 1.0,
-        y: window.innerHeight / 2 - avgY * 1.0,
-        zoom: 1.0,
-      });
+      centerCanvasOnNodes(nodes);
     } else {
       setViewport({
         x: window.innerWidth / 2 - 200,
@@ -591,6 +631,7 @@ export default function Home() {
         }
         const updatedNodes = await db.nodes.toArray();
         setNodes(updatedNodes);
+        centerCanvasOnNodes(updatedNodes);
       }
 
       if (cloudMeta) {
@@ -643,6 +684,7 @@ export default function Home() {
     >
       {/* Background Dot Matrix Grid */}
       <div
+        className="canvas-bg-grid"
         style={{
           position: 'absolute',
           inset: 0,
@@ -722,29 +764,21 @@ export default function Home() {
         isSyncing={isSyncingDrive}
       />
 
-      {/* Bottom-Left Controls: Theme Toggle + Zoom Controls */}
+      {/* Top-Left Controls: Theme Toggle + Zoom Controls (keeps bottom clean for dock pill) */}
       <div
-        style={{
-          position: 'fixed',
-          bottom: '24px',
-          left: '24px',
-          zIndex: 40,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-        }}
+        className="fixed top-4 left-4 md:top-6 md:left-6 z-40 flex items-center gap-2"
       >
-        {/* Theme Mode Toggle (Left side of zoom bar) */}
+        {/* Theme Mode Toggle */}
         <button
           onClick={toggleTheme}
           className="glass-circle-btn"
           style={{
-            width: '36px',
-            height: '36px',
+            width: '32px',
+            height: '32px',
             backdropFilter: 'blur(28px) saturate(190%) brightness(105%)',
             backgroundColor: 'var(--glass-bg)',
             border: '1px solid var(--glass-border)',
-            boxShadow: '0 20px 45px -8px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12)',
+            boxShadow: '0 12px 30px -6px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12)',
           }}
           title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
@@ -764,37 +798,37 @@ export default function Home() {
             backgroundColor: 'var(--glass-bg)',
             border: '1px solid var(--glass-border)',
             borderRadius: '9999px',
-            padding: '4px 6px',
-            gap: '4px',
-            boxShadow: '0 20px 45px -8px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12)',
+            padding: '3px 5px',
+            gap: '3px',
+            boxShadow: '0 12px 30px -6px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12)',
           }}
         >
-          <span style={{ fontSize: '12px', padding: '0 6px', color: 'var(--text-muted)', fontWeight: 500, minWidth: '38px', textAlign: 'center' }}>
+          <span style={{ fontSize: '11px', padding: '0 5px', color: 'var(--text-muted)', fontWeight: 600, minWidth: '34px', textAlign: 'center' }}>
             {Math.round(viewport.zoom * 100)}%
           </span>
           <button
             onClick={() => setViewport((prev) => ({ ...prev, zoom: Math.max(0.2, prev.zoom - 0.1) }))}
             className="glass-circle-btn"
-            style={{ width: '28px', height: '28px' }}
+            style={{ width: '26px', height: '26px' }}
             title="Zoom Out"
           >
-            <ZoomOut className="w-3.5 h-3.5" />
+            <ZoomOut className="w-3 h-3" />
           </button>
           <button
             onClick={() => setViewport((prev) => ({ ...prev, zoom: Math.min(2.5, prev.zoom + 0.1) }))}
             className="glass-circle-btn"
-            style={{ width: '28px', height: '28px' }}
+            style={{ width: '26px', height: '26px' }}
             title="Zoom In"
           >
-            <ZoomIn className="w-3.5 h-3.5" />
+            <ZoomIn className="w-3 h-3" />
           </button>
           <button
             onClick={handleResetTo100}
             className="glass-circle-btn"
-            style={{ width: '28px', height: '28px' }}
+            style={{ width: '26px', height: '26px' }}
             title="Center and Reset to 100%"
           >
-            <Maximize2 className="w-3.5 h-3.5" />
+            <Maximize2 className="w-3 h-3" />
           </button>
         </div>
       </div>

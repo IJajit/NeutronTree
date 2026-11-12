@@ -9,21 +9,23 @@ interface MinimapProps {
 
 export const Minimap: React.FC<MinimapProps> = ({ nodes, viewport, onNavigate }) => {
   const [windowDimensions, setWindowDimensions] = useState({ width: 1440, height: 900 });
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setWindowDimensions({ width: window.innerWidth, height: window.innerHeight });
-      const handleResize = () => {
+      const updateDim = () => {
         setWindowDimensions({ width: window.innerWidth, height: window.innerHeight });
+        setIsMobile(window.innerWidth < 768);
       };
-      window.addEventListener('resize', handleResize);
-      return () => window.removeEventListener('resize', handleResize);
+      updateDim();
+      window.addEventListener('resize', updateDim);
+      return () => window.removeEventListener('resize', updateDim);
     }
   }, []);
 
-  const mapWidth = 180;
-  const mapHeight = 120;
-  const scale = 0.04;
+  const mapWidth = isMobile ? 104 : 170;
+  const mapHeight = isMobile ? 68 : 110;
+  const scale = isMobile ? 0.024 : 0.038;
 
   const handleMinimapClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -38,7 +40,7 @@ export const Minimap: React.FC<MinimapProps> = ({ nodes, viewport, onNavigate })
   return (
     <div
       onClick={handleMinimapClick}
-      className="fixed bottom-6 right-6 z-40 backdrop-blur-xl border rounded-2xl p-2.5 shadow-2xl cursor-crosshair overflow-hidden group hover:border-[var(--liverpool)] transition-all"
+      className="fixed top-4 right-4 md:top-6 md:right-6 z-40 backdrop-blur-xl border rounded-xl md:rounded-2xl p-1.5 md:p-2.5 shadow-xl cursor-crosshair overflow-hidden group hover:border-[var(--liverpool)] transition-all"
       style={{
         width: mapWidth,
         height: mapHeight,
