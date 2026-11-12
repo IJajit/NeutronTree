@@ -59,7 +59,7 @@ export async function requestGoogleDriveAuth(clientId: string): Promise<string> 
   await loadGisScript();
 
   if (!window.google?.accounts?.oauth2) {
-    throw new Error('Google Identity Services SDK failed to initialize.');
+    throw new Error('Google Identity Services SDK failed to load. Please check your internet connection or ad blocker.');
   }
 
   return new Promise((resolve, reject) => {
@@ -77,6 +77,15 @@ export async function requestGoogleDriveAuth(clientId: string): Promise<string> 
             resolve(response.access_token);
           } else {
             reject(new Error('No access token received from Google.'));
+          }
+        },
+        error_callback: (err: any) => {
+          if (err?.type === 'popup_failed_to_open') {
+            reject(new Error('Popup blocked! Please allow popups for https://neutrontree.vercel.app in your browser address bar.'));
+          } else if (err?.type === 'popup_closed') {
+            reject(new Error('Sign-in cancelled. Popup was closed before authorization.'));
+          } else {
+            reject(new Error(err?.message || 'Google authorization window encountered an error.'));
           }
         },
       });

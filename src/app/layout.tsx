@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -20,6 +21,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="h-full antialiased dark">
+      <head>
+        <Script src="https://accounts.google.com/gsi/client" strategy="beforeInteractive" />
+      </head>
       <body className="min-h-full flex flex-col bg-[#070707] text-[#ededed]">{children}</body>
     </html>
   );
