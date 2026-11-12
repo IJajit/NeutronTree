@@ -55,11 +55,15 @@ export async function loadGisScript(): Promise<void> {
 /**
  * Triggers interactive Google OAuth popup using Google Identity Services
  */
-export async function requestGoogleDriveAuth(clientId: string): Promise<string> {
-  await loadGisScript();
+export function requestGoogleDriveAuth(clientId: string): Promise<string> {
+  if (typeof window === 'undefined') {
+    return Promise.reject(new Error('Window not available'));
+  }
 
   if (!window.google?.accounts?.oauth2) {
-    throw new Error('Google Identity Services SDK failed to load. Please check your internet connection or ad blocker.');
+    return Promise.reject(
+      new Error('Google Identity Services script is still loading. Please wait 2 seconds and try again.')
+    );
   }
 
   return new Promise((resolve, reject) => {
@@ -105,10 +109,7 @@ export async function requestGoogleDriveAuth(clientId: string): Promise<string> 
             resolved = true;
             reject(new Error('Popup blocked! Please allow popups for https://neutrontree.vercel.app in your browser address bar.'));
           } else if (err?.type === 'popup_closed') {
-            // Note: Google's GIS client erroneously fires popup_closed whenever navigation
-            // happens inside the OAuth popup (such as navigating past the "unverified app" screen).
-            // We ignore popup_closed unless the failsafe timeout expires or the user explicitly retries.
-            console.log('Popup closed notification received from GIS; waiting for token callback or user action.');
+            console.log('Popup navigation event received; awaiting consent completion.');
           } else {
             clearTimeout(failsafeTimeout);
             resolved = true;

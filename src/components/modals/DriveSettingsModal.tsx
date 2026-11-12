@@ -28,7 +28,7 @@ export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleConnect = async () => {
+  const handleConnect = () => {
     const trimmedId = clientId.trim();
     if (!trimmedId) {
       setErrorMessage('Please enter your Google OAuth Client ID.');
@@ -47,18 +47,20 @@ export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
 
     setErrorMessage(null);
     setIsAuthenticating(true);
+    localStorage.setItem('gdrive_client_id', trimmedId);
 
-    try {
-      localStorage.setItem('gdrive_client_id', trimmedId);
-      await requestGoogleDriveAuth(trimmedId);
-      onConnectDrive(true);
-      onClose();
-    } catch (err: any) {
-      console.error('Google OAuth error:', err);
-      setErrorMessage(err.message || 'Authentication failed. Please check your Authorized JavaScript Origins.');
-    } finally {
-      setIsAuthenticating(false);
-    }
+    // Call directly in same microtask to keep the browser user activation flag alive
+    requestGoogleDriveAuth(trimmedId)
+      .then((token) => {
+        setIsAuthenticating(false);
+        onConnectDrive(true);
+        onClose();
+      })
+      .catch((err: any) => {
+        console.error('Google OAuth error:', err);
+        setIsAuthenticating(false);
+        setErrorMessage(err.message || 'Authentication failed. Please check your Authorized JavaScript Origins.');
+      });
   };
 
   const handleDisconnect = () => {
