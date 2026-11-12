@@ -9,6 +9,7 @@ import { Minimap } from '@/components/canvas/Minimap';
 import { QuickAddModal } from '@/components/modals/QuickAddModal';
 import { DriveSettingsModal } from '@/components/modals/DriveSettingsModal';
 import { Undo2, ZoomIn, ZoomOut, Maximize2, Sun, Moon } from 'lucide-react';
+import { getStoredAccessToken, syncNodeToGoogleDrive, trashNodeOnGoogleDrive } from '@/lib/drive/googleDrive';
 
 export default function Home() {
   const [nodes, setNodes] = useState<BlockNode[]>([]);
@@ -67,6 +68,9 @@ export default function Home() {
       const allCats = await db.categories.orderBy('order').toArray();
       const allNodes = await db.nodes.toArray();
       const savedBoard = await db.boardState.get('main');
+
+      // Check live Drive connection token
+      setIsDriveConnected(Boolean(getStoredAccessToken()));
 
       // Auto-heal: Ensure all nodes reference an existing category, else migrate to 'general'
       const catIdSet = new Set(allCats.map((c) => c.id));
@@ -353,6 +357,11 @@ export default function Home() {
 
       await db.nodes.delete(id);
       setNodes((prev) => prev.filter((n) => n.id !== id));
+
+      // Move to Google Drive native trash if connected
+      if (isDriveConnected) {
+        trashNodeOnGoogleDrive(id);
+      }
     }
   };
 
@@ -360,6 +369,9 @@ export default function Home() {
     if (recentlyDeleted) {
       await db.nodes.put(recentlyDeleted);
       setNodes((prev) => [...prev, recentlyDeleted]);
+      if (isDriveConnected) {
+        syncNodeToGoogleDrive(recentlyDeleted);
+      }
       setRecentlyDeleted(null);
       setShowUndoToast(false);
     }
@@ -393,12 +405,26 @@ export default function Home() {
     await db.nodes.put(newNode);
     setNodes((prev) => [...prev, newNode]);
     setSelectedNodeId(newNode.id);
+
+    // Sync to Google Drive if connected
+    if (isDriveConnected) {
+      syncNodeToGoogleDrive(newNode);
+    }
   };
 
   const handleUpdateNode = async (id: string, partial: Partial<BlockNode>) => {
     await db.nodes.update(id, partial);
     setNodes((prev) =>
-      prev.map((n) => (n.id === id ? ({ ...n, ...partial } as BlockNode) : n))
+      prev.map((n) => {
+        if (n.id === id) {
+          const updated = { ...n, ...partial } as BlockNode;
+          if (isDriveConnected) {
+            syncNodeToGoogleDrive(updated);
+          }
+          return updated;
+        }
+        return n;
+      })
     );
   };
 
@@ -632,7 +658,7 @@ export default function Home() {
         isOpen={isDriveModalOpen}
         onClose={() => setIsDriveModalOpen(false)}
         isDriveConnected={isDriveConnected}
-        onConnectDrive={() => setIsDriveConnected(true)}
+        onConnectDrive={(connected) => setIsDriveConnected(connected)}
       />
     </div>
   );

@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { Cloud, CheckCircle2, ShieldCheck, FolderSync, Info, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Cloud, CheckCircle2, ShieldCheck, FolderSync, Info, X, Loader2, AlertCircle } from 'lucide-react';
+import { requestGoogleDriveAuth, setStoredAccessToken, getStoredAccessToken } from '@/lib/drive/googleDrive';
 
 interface DriveSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   isDriveConnected: boolean;
-  onConnectDrive: () => void;
+  onConnectDrive: (connected: boolean) => void;
 }
 
 export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
@@ -15,8 +16,56 @@ export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
   onConnectDrive,
 }) => {
   const [clientId, setClientId] = useState('');
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedClientId = localStorage.getItem('gdrive_client_id') || '';
+      setClientId(savedClientId);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const handleConnect = async () => {
+    const trimmedId = clientId.trim();
+    if (!trimmedId) {
+      setErrorMessage('Please enter your Google OAuth Client ID.');
+      return;
+    }
+
+    if (trimmedId.startsWith('GOCSPX-')) {
+      setErrorMessage('That looks like a Client Secret (starts with GOCSPX-). Please paste the Client ID ending with .apps.googleusercontent.com');
+      return;
+    }
+
+    if (!trimmedId.endsWith('.apps.googleusercontent.com')) {
+      setErrorMessage('Your Client ID must end with .apps.googleusercontent.com (find it in Google Cloud Credentials).');
+      return;
+    }
+
+    setErrorMessage(null);
+    setIsAuthenticating(true);
+
+    try {
+      localStorage.setItem('gdrive_client_id', trimmedId);
+      await requestGoogleDriveAuth(trimmedId);
+      onConnectDrive(true);
+      onClose();
+    } catch (err: any) {
+      console.error('Google OAuth error:', err);
+      setErrorMessage(err.message || 'Authentication failed. Please check your Authorized JavaScript Origins.');
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handleDisconnect = () => {
+    setStoredAccessToken(null);
+    onConnectDrive(false);
+    setErrorMessage(null);
+  };
 
   return (
     <div
@@ -132,30 +181,52 @@ export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '12px', color: '#aaaaaa', fontWeight: 500 }}>
-              Google OAuth Client ID (Optional for Live OAuth PKCE)
+            <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>
+              Google OAuth Client ID (from Google Cloud Credentials)
             </label>
             <input
               type="text"
-              placeholder="xxxx.apps.googleusercontent.com"
+              placeholder="123456789-abcdef.apps.googleusercontent.com"
               value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
+              onChange={(e) => {
+                setClientId(e.target.value);
+                if (errorMessage) setErrorMessage(null);
+              }}
               style={{
                 width: '100%',
-                backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
+                backgroundColor: 'var(--input-bg)',
+                border: errorMessage ? '1px solid var(--liverpool)' : '1px solid var(--border)',
                 borderRadius: '12px',
                 padding: '12px 14px',
                 fontSize: '13px',
-                color: '#ededed',
+                color: 'var(--text-main)',
                 outline: 'none',
               }}
             />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#777777', fontSize: '11px' }}>
+          {errorMessage && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(200, 16, 46, 0.12)',
+                border: '1px solid rgba(200, 16, 46, 0.3)',
+                color: '#ff6b7e',
+                fontSize: '12px',
+              }}
+            >
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '11px' }}>
             <Info className="w-3.5 h-3.5 text-[var(--liverpool)] shrink-0" />
-            <span>High-speed client caching is active via browser IndexedDB.</span>
+            <span>Authorized Origin: <code style={{ color: 'var(--text-main)' }}>https://neutrontree.vercel.app</code></span>
           </div>
 
           <div
@@ -166,15 +237,16 @@ export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
               gap: '12px',
               marginTop: '8px',
               paddingTop: '16px',
-              borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+              borderTop: '1px solid var(--border)',
             }}
           >
             <button
               onClick={onClose}
+              disabled={isAuthenticating}
               style={{
                 padding: '8px 18px',
                 fontSize: '13px',
-                color: '#888888',
+                color: 'var(--text-muted)',
                 backgroundColor: 'transparent',
                 border: 'none',
                 cursor: 'pointer',
@@ -183,23 +255,25 @@ export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
               Close
             </button>
             <button
-              onClick={() => {
-                onConnectDrive();
-                onClose();
-              }}
+              onClick={isDriveConnected ? handleDisconnect : handleConnect}
+              disabled={isAuthenticating}
               style={{
                 padding: '9px 22px',
-                backgroundColor: 'var(--liverpool)',
+                backgroundColor: isDriveConnected ? 'rgba(255, 255, 255, 0.1)' : 'var(--liverpool)',
                 color: '#ffffff',
                 borderRadius: '9999px',
                 fontSize: '13px',
                 fontWeight: 500,
                 border: 'none',
-                cursor: 'pointer',
-                boxShadow: '0 0 15px var(--liverpool-glow)',
+                cursor: isAuthenticating ? 'not-allowed' : 'pointer',
+                boxShadow: isDriveConnected ? 'none' : '0 0 15px var(--liverpool-glow)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
               }}
             >
-              {isDriveConnected ? 'Disconnect' : 'Connect Google Drive'}
+              {isAuthenticating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {isDriveConnected ? 'Disconnect' : (isAuthenticating ? 'Authorizing with Google...' : 'Connect Google Drive')}
             </button>
           </div>
         </div>
