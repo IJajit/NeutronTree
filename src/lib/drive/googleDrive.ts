@@ -92,15 +92,15 @@ export async function requestGoogleDriveAuth(clientId: string): Promise<string> 
             resolved = true;
             reject(new Error('Popup blocked! Please allow popups for https://neutrontree.vercel.app in your browser address bar.'));
           } else if (err?.type === 'popup_closed') {
-            // NOTE: Google GIS often emits popup_closed prematurely when navigating between intermediate
-            // warning/consent pages like "Google hasn't verified this app".
-            // Give the user a grace period to complete consent before assuming it was actually cancelled.
+            // Do NOT immediately reject on popup_closed because Google Identity Services
+            // fires popup_closed while the user is still interacting with the "Google hasn't verified this app"
+            // warning or multi-step consent screen. We only reject if no token is received after 60 seconds of inactivity.
             setTimeout(() => {
               if (!resolved && !getStoredAccessToken()) {
                 resolved = true;
-                reject(new Error('Sign-in cancelled or popup closed before completing authorization.'));
+                reject(new Error('Authorization timed out or the Google window was closed.'));
               }
-            }, 3000);
+            }, 60000);
           } else {
             resolved = true;
             reject(new Error(err?.message || 'Google authorization window encountered an error.'));
