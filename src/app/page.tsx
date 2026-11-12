@@ -104,11 +104,34 @@ export default function Home() {
       const allNodes = await db.nodes.toArray();
       const savedBoard = await db.boardState.get('main');
 
+      // Always populate local database items first so user never sees an empty screen
+      const catIdSet = new Set(allCats.map((c) => c.id));
+      const healedNodes = await Promise.all(
+        allNodes.map(async (n) => {
+          if (n.category !== 'general' && !catIdSet.has(n.category)) {
+            await db.nodes.update(n.id, { category: 'general', updatedAt: Date.now() });
+            return { ...n, category: 'general' };
+          }
+          return n;
+        })
+      );
+
+      setCategories(allCats);
+      setNodes(healedNodes);
+      if (healedNodes.length > 0) {
+        centerCanvasOnNodes(healedNodes);
+      } else if (savedBoard) {
+        setViewport(savedBoard.viewport);
+      }
+      if (savedBoard) {
+        setActiveCategory(catIdSet.has(savedBoard.activeCategory) ? savedBoard.activeCategory : 'all');
+      }
+
       // Check live Drive connection token
       const isConnected = connectedFromRedirect || Boolean(getStoredAccessToken());
       setIsDriveConnected(isConnected);
 
-      // If Google Drive is connected, pull all real cloud cards and sync board arrangement
+      // If Google Drive is connected, non-destructively pull/sync cards from cloud
       if (isConnected) {
         try {
           const [driveNodes, cloudMeta] = await Promise.all([
@@ -117,25 +140,22 @@ export default function Home() {
           ]);
 
           if (driveNodes.length > 0) {
-            // Remove local stock demo nodes if we have authentic drive cards
-            await db.nodes.clear();
+            // Save cloud nodes into local DB without losing user data
             for (const dNode of driveNodes) {
               await db.nodes.put(dNode);
             }
             const updatedNodes = await db.nodes.toArray();
             setNodes(updatedNodes);
             centerCanvasOnNodes(updatedNodes);
-          } else if (allNodes.length > 0) {
-            centerCanvasOnNodes(allNodes);
           }
 
           if (cloudMeta) {
             if (cloudMeta.categories && cloudMeta.categories.length > 0) {
-              await db.categories.clear();
               for (const c of cloudMeta.categories) {
                 await db.categories.put(c);
               }
-              setCategories(cloudMeta.categories);
+              const mergedCats = await db.categories.orderBy('order').toArray();
+              setCategories(mergedCats);
             }
             if (cloudMeta.activeCategory) {
               setActiveCategory(cloudMeta.activeCategory);
@@ -143,29 +163,6 @@ export default function Home() {
           }
         } catch (e) {
           console.warn('Drive pull error:', e);
-        }
-      } else {
-        // Auto-heal: Ensure all nodes reference an existing category, else migrate to 'general'
-        const catIdSet = new Set(allCats.map((c) => c.id));
-        const healedNodes = await Promise.all(
-          allNodes.map(async (n) => {
-            if (n.category !== 'general' && !catIdSet.has(n.category)) {
-              await db.nodes.update(n.id, { category: 'general', updatedAt: Date.now() });
-              return { ...n, category: 'general' };
-            }
-            return n;
-          })
-        );
-
-        setCategories(allCats);
-        setNodes(healedNodes);
-        if (healedNodes.length > 0) {
-          centerCanvasOnNodes(healedNodes);
-        } else if (savedBoard) {
-          setViewport(savedBoard.viewport);
-        }
-        if (savedBoard) {
-          setActiveCategory(catIdSet.has(savedBoard.activeCategory) ? savedBoard.activeCategory : 'all');
         }
       }
     }
