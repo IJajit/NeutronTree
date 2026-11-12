@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Cloud, CheckCircle2, ShieldCheck, FolderSync, Info, X, Loader2, AlertCircle } from 'lucide-react';
-import { requestGoogleDriveAuth, setStoredAccessToken, getStoredAccessToken } from '@/lib/drive/googleDrive';
+import {
+  requestGoogleDriveAuth,
+  redirectToGoogleOAuth,
+  setStoredAccessToken,
+  getStoredAccessToken,
+} from '@/lib/drive/googleDrive';
 
 interface DriveSettingsModalProps {
   isOpen: boolean;
@@ -49,18 +54,8 @@ export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
     setIsAuthenticating(true);
     localStorage.setItem('gdrive_client_id', trimmedId);
 
-    // Call directly in same microtask to keep the browser user activation flag alive
-    requestGoogleDriveAuth(trimmedId)
-      .then((token) => {
-        setIsAuthenticating(false);
-        onConnectDrive(true);
-        onClose();
-      })
-      .catch((err: any) => {
-        console.error('Google OAuth error:', err);
-        setIsAuthenticating(false);
-        setErrorMessage(err.message || 'Authentication failed. Please check your Authorized JavaScript Origins.');
-      });
+    // Use full direct redirect flow to bypass popup blockers and COOP isolation completely
+    redirectToGoogleOAuth(trimmedId);
   };
 
   const handleDisconnect = () => {

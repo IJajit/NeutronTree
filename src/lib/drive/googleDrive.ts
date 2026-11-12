@@ -27,29 +27,41 @@ export function setStoredAccessToken(token: string | null) {
 }
 
 /**
- * Loads Google Identity Services client script dynamically
+ * Checks URL hash on page load for OAuth redirect response
  */
-export async function loadGisScript(): Promise<void> {
+export function handleOAuthRedirectResponse(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (!window.location.hash) return false;
+
+  const hashParams = new URLSearchParams(window.location.hash.substring(1));
+  const token = hashParams.get('access_token');
+  if (token) {
+    setStoredAccessToken(token);
+    // Clean up hash from address bar
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Direct full-page OAuth redirect (100% reliable, immune to popup blockers & browser isolation)
+ */
+export function redirectToGoogleOAuth(clientId: string) {
   if (typeof window === 'undefined') return;
-  if (window.google?.accounts?.oauth2) return;
+  const redirectUri = window.location.origin + window.location.pathname;
+  const authUrl =
+    `https://accounts.google.com/o/oauth2/v2/auth?` +
+    new URLSearchParams({
+      client_id: clientId.trim(),
+      redirect_uri: redirectUri,
+      response_type: 'token',
+      scope: DRIVE_FILE_SCOPE,
+      include_granted_scopes: 'true',
+      prompt: 'consent',
+    }).toString();
 
-  return new Promise((resolve, reject) => {
-    const existing = document.getElementById('google-gis-script');
-    if (existing) {
-      existing.addEventListener('load', () => resolve());
-      existing.addEventListener('error', (e) => reject(e));
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.id = 'google-gis-script';
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = (e) => reject(e);
-    document.head.appendChild(script);
-  });
+  window.location.href = authUrl;
 }
 
 /**

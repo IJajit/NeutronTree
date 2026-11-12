@@ -9,7 +9,12 @@ import { Minimap } from '@/components/canvas/Minimap';
 import { QuickAddModal } from '@/components/modals/QuickAddModal';
 import { DriveSettingsModal } from '@/components/modals/DriveSettingsModal';
 import { Undo2, ZoomIn, ZoomOut, Maximize2, Sun, Moon } from 'lucide-react';
-import { getStoredAccessToken, syncNodeToGoogleDrive, trashNodeOnGoogleDrive } from '@/lib/drive/googleDrive';
+import {
+  getStoredAccessToken,
+  syncNodeToGoogleDrive,
+  trashNodeOnGoogleDrive,
+  handleOAuthRedirectResponse,
+} from '@/lib/drive/googleDrive';
 
 export default function Home() {
   const [nodes, setNodes] = useState<BlockNode[]>([]);
@@ -64,13 +69,16 @@ export default function Home() {
   // Initialize Data
   useEffect(() => {
     async function loadData() {
+      // Check for incoming redirect OAuth token from Google
+      const connectedFromRedirect = handleOAuthRedirectResponse();
+
       await initializeDbDefaults();
       const allCats = await db.categories.orderBy('order').toArray();
       const allNodes = await db.nodes.toArray();
       const savedBoard = await db.boardState.get('main');
 
       // Check live Drive connection token
-      setIsDriveConnected(Boolean(getStoredAccessToken()));
+      setIsDriveConnected(connectedFromRedirect || Boolean(getStoredAccessToken()));
 
       // Auto-heal: Ensure all nodes reference an existing category, else migrate to 'general'
       const catIdSet = new Set(allCats.map((c) => c.id));
