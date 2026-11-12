@@ -49,7 +49,8 @@ export function handleOAuthRedirectResponse(): boolean {
  */
 export function redirectToGoogleOAuth(clientId: string) {
   if (typeof window === 'undefined') return;
-  const redirectUri = window.location.origin + window.location.pathname;
+  // Strip trailing slashes to guarantee exact match with standard origins
+  const redirectUri = window.location.origin.replace(/\/+$/, '');
   const authUrl =
     `https://accounts.google.com/o/oauth2/v2/auth?` +
     new URLSearchParams({
