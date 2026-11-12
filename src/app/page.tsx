@@ -14,6 +14,7 @@ import {
   syncNodeToGoogleDrive,
   trashNodeOnGoogleDrive,
   handleOAuthRedirectResponse,
+  pullNodesFromGoogleDrive,
 } from '@/lib/drive/googleDrive';
 
 export default function Home() {
@@ -78,7 +79,25 @@ export default function Home() {
       const savedBoard = await db.boardState.get('main');
 
       // Check live Drive connection token
-      setIsDriveConnected(connectedFromRedirect || Boolean(getStoredAccessToken()));
+      const isConnected = connectedFromRedirect || Boolean(getStoredAccessToken());
+      setIsDriveConnected(isConnected);
+
+      // If Google Drive is connected, pull all real cloud cards from Google Drive
+      if (isConnected) {
+        try {
+          const driveNodes = await pullNodesFromGoogleDrive();
+          if (driveNodes.length > 0) {
+            // Merge with local nodes
+            for (const dNode of driveNodes) {
+              await db.nodes.put(dNode);
+            }
+            const updatedNodes = await db.nodes.toArray();
+            setNodes(updatedNodes);
+          }
+        } catch (e) {
+          console.warn('Drive pull error:', e);
+        }
+      }
 
       // Auto-heal: Ensure all nodes reference an existing category, else migrate to 'general'
       const catIdSet = new Set(allCats.map((c) => c.id));

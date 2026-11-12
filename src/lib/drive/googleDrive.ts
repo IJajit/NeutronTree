@@ -140,8 +140,48 @@ export function requestGoogleDriveAuth(clientId: string): Promise<string> {
 }
 
 /**
- * Finds or creates a folder in Google Drive
+ * Pulls all blocks saved in Google Drive into local browser storage
  */
+export async function pullNodesFromGoogleDrive(): Promise<BlockNode[]> {
+  const token = getStoredAccessToken();
+  if (!token) return [];
+
+  try {
+    // 1. Search for all .json block state files in Google Drive created by this app
+    const query = `mimeType = 'application/json' and name contains 'block-' and trashed = false`;
+    const searchRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&pageSize=100`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    const searchData = await searchRes.json();
+    const files = searchData.files || [];
+    const pulledNodes: BlockNode[] = [];
+
+    for (const file of files) {
+      try {
+        const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (fileRes.ok) {
+          const nodeData = await fileRes.json();
+          if (nodeData && nodeData.id && nodeData.type) {
+            pulledNodes.push(nodeData);
+          }
+        }
+      } catch (err) {
+        console.warn(`Failed to read Drive file ${file.name}:`, err);
+      }
+    }
+
+    return pulledNodes;
+  } catch (err) {
+    console.warn('Failed to pull nodes from Google Drive:', err);
+    return [];
+  }
+}
 async function getOrCreateDriveFolder(folderName: string, parentId?: string): Promise<string> {
   const token = getStoredAccessToken();
   if (!token) throw new Error('Missing Google Drive access token');
