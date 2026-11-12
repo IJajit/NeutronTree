@@ -24,6 +24,9 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const [url, setUrl] = useState('');
   const [noteContent, setNoteContent] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [fileBase64, setFileBase64] = useState<string>('');
+  const [fileMimeType, setFileMimeType] = useState<string>('');
+  const [fileActualName, setFileActualName] = useState<string>('');
   const [fileName, setFileName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedCat, setSelectedCat] = useState(
@@ -57,13 +60,18 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
           content: noteContent,
         });
       } else if (tab === 'image') {
-        onAdd('image', title || 'Inspiration Snapshot', selectedCat, {
-          thumbnailUrl: imageUrl,
+        onAdd('image', title || fileActualName || 'Inspiration Snapshot', selectedCat, {
+          thumbnailUrl: fileBase64 || imageUrl,
+          rawFileBase64: fileBase64 || imageUrl,
+          fileName: fileActualName || (title ? `${title}.png` : 'image.png'),
+          mimeType: fileMimeType || 'image/png',
         });
       } else if (tab === 'document') {
-        onAdd('document', title || fileName || 'Document', selectedCat, {
-          fileName: fileName || 'document.pdf',
+        onAdd('document', title || fileActualName || fileName || 'Document', selectedCat, {
+          fileName: fileActualName || fileName || (title ? `${title}.pdf` : 'document.pdf'),
           description,
+          rawFileBase64: fileBase64,
+          mimeType: fileMimeType || 'application/pdf',
         });
       } else if (tab === 'video') {
         onAdd('video', title || 'Video Clip', selectedCat, {
@@ -311,13 +319,50 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                   }}
                 />
               </div>
+
+              {/* Direct File Upload Zone */}
+              <div
+                style={{
+                  border: '1px dashed rgba(255, 255, 255, 0.2)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  textAlign: 'center',
+                  backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                  cursor: 'pointer',
+                }}
+                onClick={() => document.getElementById('image-file-input')?.click()}
+              >
+                <input
+                  id="image-file-input"
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setFileActualName(file.name);
+                      setFileMimeType(file.type || 'image/png');
+                      if (!title) setTitle(file.name.replace(/\.[^/.]+$/, ''));
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        setFileBase64(event.target?.result as string);
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                />
+                <p style={{ fontSize: '13px', color: fileActualName ? '#4ade80' : '#888' }}>
+                  {fileActualName ? `✓ Selected: ${fileActualName}` : '📁 Click to choose an Image file from computer'}
+                </p>
+                <span style={{ fontSize: '11px', color: '#555' }}>or paste an image web URL below</span>
+              </div>
+
               <div>
                 <input
                   type="url"
-                  required
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="Image URL https://..."
+                  placeholder="Or Image URL https://..."
                   style={{
                     width: '100%',
                     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -328,7 +373,6 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                     color: '#ededed',
                     outline: 'none',
                   }}
-                  autoFocus
                 />
               </div>
             </>
@@ -339,7 +383,6 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
               <div>
                 <input
                   type="text"
-                  required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Document Name (e.g. Portfolio.pdf)..."
@@ -356,6 +399,43 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                   autoFocus
                 />
               </div>
+
+              {/* Direct PDF / Document Upload */}
+              <div
+                style={{
+                  border: '1px dashed rgba(255, 255, 255, 0.2)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  textAlign: 'center',
+                  backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                  cursor: 'pointer',
+                }}
+                onClick={() => document.getElementById('doc-file-input')?.click()}
+              >
+                <input
+                  id="doc-file-input"
+                  type="file"
+                  accept=".pdf,.doc,.docx,.txt"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setFileActualName(file.name);
+                      setFileMimeType(file.type || 'application/pdf');
+                      if (!title) setTitle(file.name.replace(/\.[^/.]+$/, ''));
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        setFileBase64(event.target?.result as string);
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                />
+                <p style={{ fontSize: '13px', color: fileActualName ? '#4ade80' : '#888' }}>
+                  {fileActualName ? `✓ Selected: ${fileActualName}` : '📄 Click to choose a PDF or document file'}
+                </p>
+              </div>
+
               <div>
                 <input
                   type="text"

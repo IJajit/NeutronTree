@@ -31,6 +31,7 @@ export interface BlockNode {
     fileSize?: number;
     aspectRatio?: number;
     colorAccent?: string;
+    rawFileBase64?: string;
   };
 }
 

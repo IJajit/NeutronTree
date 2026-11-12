@@ -183,7 +183,73 @@ async function getOrCreateDriveFolder(folderName: string, parentId?: string): Pr
 }
 
 /**
- * Uploads or updates a node block JSON inside /NeuronTree/[Category]/
+ * Helper to upload raw binary data (image, pdf) or text/shortcut to Google Drive
+ */
+async function uploadMediaFileToDrive(
+  fileName: string,
+  mimeType: string,
+  blobOrText: Blob | string,
+  parentFolderId: string,
+  token: string
+): Promise<string | null> {
+  try {
+    const metadata = {
+      name: fileName,
+      mimeType: mimeType,
+      parents: [parentFolderId],
+    };
+
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json; charset=UTF-8' }));
+    if (typeof blobOrText === 'string') {
+      form.append('file', new Blob([blobOrText], { type: mimeType }), fileName);
+    } else {
+      form.append('file', blobOrText, fileName);
+    }
+
+    const uploadRes = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: form,
+      }
+    );
+
+    const uploadData = await uploadRes.json();
+    return uploadData.id || null;
+  } catch (err) {
+    console.warn('Error uploading media asset to Drive:', err);
+    return null;
+  }
+}
+
+/**
+ * Converts a base64 Data URL to a Blob
+ */
+function dataUrlToBlob(dataUrl: string, fallbackMime: string): Blob {
+  try {
+    const parts = dataUrl.split(',');
+    const mimeMatch = parts[0].match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : fallbackMime;
+    const bstr = atob(parts[1] || parts[0]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+  } catch {
+    return new Blob([dataUrl], { type: fallbackMime });
+  }
+}
+
+/**
+ * Uploads or updates a node block inside /NeuronTree/[Category]/
+ * Creates direct accessible human files (Images, PDFs, .url Shortcuts, .md Notes)
+ * along with the companion index JSON for canvas reconstruction.
  */
 export async function syncNodeToGoogleDrive(node: BlockNode): Promise<string | null> {
   const token = getStoredAccessToken();
@@ -193,10 +259,35 @@ export async function syncNodeToGoogleDrive(node: BlockNode): Promise<string | n
     const rootFolderId = await getOrCreateDriveFolder('NeuronTree');
     const categoryFolderId = await getOrCreateDriveFolder(node.category || 'general', rootFolderId);
 
+    // 1. Upload the real, accessible user asset (Images, PDFs, Links, Markdown Notes)
+    const cleanTitle = (node.data.title || node.id).replace(/[\\/:*?"<>|]/g, '_').trim();
+
+    if (node.type === 'image' && node.data.thumbnailUrl?.startsWith('data:')) {
+      const imgBlob = dataUrlToBlob(node.data.thumbnailUrl, node.data.mimeType || 'image/png');
+      const imgExt = (node.data.mimeType || 'image/png').split('/')[1] || 'png';
+      const userFileName = node.data.fileName || `${cleanTitle}.${imgExt}`;
+      await uploadMediaFileToDrive(userFileName, node.data.mimeType || 'image/png', imgBlob, categoryFolderId, token);
+    } else if (node.type === 'document' && node.data.rawFileBase64?.startsWith('data:')) {
+      const docBlob = dataUrlToBlob(node.data.rawFileBase64, node.data.mimeType || 'application/pdf');
+      const userFileName = node.data.fileName || `${cleanTitle}.pdf`;
+      await uploadMediaFileToDrive(userFileName, node.data.mimeType || 'application/pdf', docBlob, categoryFolderId, token);
+    } else if (node.type === 'link' && node.data.url) {
+      // Create clickable Internet Shortcut (.url file) that directly opens in browsers
+      const urlShortcutContent = `[InternetShortcut]\r\nURL=${node.data.url}\r\n`;
+      const shortcutFileName = `${cleanTitle}.url`;
+      await uploadMediaFileToDrive(shortcutFileName, 'text/plain', urlShortcutContent, categoryFolderId, token);
+    } else if (node.type === 'note') {
+      // Create readable Markdown document
+      const noteContent = `# ${node.data.title || 'Note'}\r\n\r\n${node.data.content || ''}\r\n`;
+      const noteFileName = `${cleanTitle}.md`;
+      await uploadMediaFileToDrive(noteFileName, 'text/markdown', noteContent, categoryFolderId, token);
+    }
+
+    // 2. Upload canvas coordinate state JSON
     const fileName = `${node.id}.json`;
     const fileContent = JSON.stringify(node, null, 2);
 
-    // Check if file exists in category folder
+    // Check if JSON exists in category folder
     const searchRes = await fetch(
       `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
         `name = '${fileName}' and '${categoryFolderId}' in parents and trashed = false`
@@ -224,22 +315,15 @@ export async function syncNodeToGoogleDrive(node: BlockNode): Promise<string | n
       );
       return existingFileId;
     } else {
-      // Create multipart file upload
-      const metadata = {
-        name: fileName,
-        mimeType: 'application/json',
-        parents: [categoryFolderId],
-      };
-
-      const boundary = 'foo_bar_baz_delimiter';
-      const multipartBody =
-        `--${boundary}\r\n` +
-        `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
-        JSON.stringify(metadata) +
-        `\r\n--${boundary}\r\n` +
-        `Content-Type: application/json\r\n\r\n` +
-        fileContent +
-        `\r\n--${boundary}--`;
+      const form = new FormData();
+      form.append(
+        'metadata',
+        new Blob(
+          [JSON.stringify({ name: fileName, mimeType: 'application/json', parents: [categoryFolderId] })],
+          { type: 'application/json; charset=UTF-8' }
+        )
+      );
+      form.append('file', new Blob([fileContent], { type: 'application/json' }), fileName);
 
       const uploadRes = await fetch(
         'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
@@ -247,9 +331,8 @@ export async function syncNodeToGoogleDrive(node: BlockNode): Promise<string | n
           method: 'POST',
           headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': `multipart/related; boundary=${boundary}`,
           },
-          body: multipartBody,
+          body: form,
         }
       );
 
