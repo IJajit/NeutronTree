@@ -65,12 +65,23 @@ export async function requestGoogleDriveAuth(clientId: string): Promise<string> 
   return new Promise((resolve, reject) => {
     let resolved = false;
 
+    // Failsafe timeout after 2 minutes
+    const failsafeTimeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        reject(new Error('Sign-in timed out. Please try again or check if popups are enabled.'));
+      }
+    }, 120000);
+
     try {
       tokenClient = window.google.accounts.oauth2.initTokenClient({
         client_id: clientId.trim(),
         scope: DRIVE_FILE_SCOPE,
         callback: (response: any) => {
+          console.log('GIS token callback received:', response);
           if (resolved) return;
+          clearTimeout(failsafeTimeout);
+
           if (response.error) {
             resolved = true;
             reject(new Error(response.error_description || response.error));
@@ -88,20 +99,18 @@ export async function requestGoogleDriveAuth(clientId: string): Promise<string> 
         error_callback: (err: any) => {
           console.warn('GIS error_callback received:', err);
           if (resolved) return;
+
           if (err?.type === 'popup_failed_to_open') {
+            clearTimeout(failsafeTimeout);
             resolved = true;
             reject(new Error('Popup blocked! Please allow popups for https://neutrontree.vercel.app in your browser address bar.'));
           } else if (err?.type === 'popup_closed') {
-            // Do NOT immediately reject on popup_closed because Google Identity Services
-            // fires popup_closed while the user is still interacting with the "Google hasn't verified this app"
-            // warning or multi-step consent screen. We only reject if no token is received after 60 seconds of inactivity.
-            setTimeout(() => {
-              if (!resolved && !getStoredAccessToken()) {
-                resolved = true;
-                reject(new Error('Authorization timed out or the Google window was closed.'));
-              }
-            }, 60000);
+            // Note: Google's GIS client erroneously fires popup_closed whenever navigation
+            // happens inside the OAuth popup (such as navigating past the "unverified app" screen).
+            // We ignore popup_closed unless the failsafe timeout expires or the user explicitly retries.
+            console.log('Popup closed notification received from GIS; waiting for token callback or user action.');
           } else {
+            clearTimeout(failsafeTimeout);
             resolved = true;
             reject(new Error(err?.message || 'Google authorization window encountered an error.'));
           }
@@ -110,6 +119,7 @@ export async function requestGoogleDriveAuth(clientId: string): Promise<string> 
 
       tokenClient.requestAccessToken({ prompt: 'consent' });
     } catch (err) {
+      clearTimeout(failsafeTimeout);
       reject(err);
     }
   });
