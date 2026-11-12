@@ -13,6 +13,7 @@ import {
   getStoredAccessToken,
   syncNodeToGoogleDrive,
   trashNodeOnGoogleDrive,
+  trashCategoryOnGoogleDrive,
   handleOAuthRedirectResponse,
   pullNodesFromGoogleDrive,
   syncBoardStateToDrive,
@@ -28,6 +29,25 @@ export default function Home() {
 
   const [viewport, setViewport] = useState<ViewportState>({ x: 140, y: 140, zoom: 0.95 });
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
+
+  // Right-click Marquee Selection State
+  const [isSelectingMarquee, setIsSelectingMarquee] = useState(false);
+  const [marqueeBox, setMarqueeBox] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
+
+  // Undo / Redo History Stack (Past & Future)
+  const undoStackRef = useRef<BlockNode[][]>([]);
+  const redoStackRef = useRef<BlockNode[][]>([]);
+  const isUndoRedoActionRef = useRef<boolean>(false);
+
+  const pushUndoSnapshot = (currentNodes: BlockNode[]) => {
+    if (isUndoRedoActionRef.current) return;
+    undoStackRef.current.push(JSON.parse(JSON.stringify(currentNodes)));
+    if (undoStackRef.current.length > 40) {
+      undoStackRef.current.shift();
+    }
+    redoStackRef.current = []; // clear redo on new action
+  };
 
   // Modals & UI States
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
@@ -63,11 +83,14 @@ export default function Home() {
 
   // Card Dragging tracking
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
-  const dragStartRef = useRef<{ mouseX: number; mouseY: number; initialNodeX: number; initialNodeY: number }>({
+  const dragStartRef = useRef<{
+    mouseX: number;
+    mouseY: number;
+    initialPositions: Map<string, { x: number; y: number }>;
+  }>({
     mouseX: 0,
     mouseY: 0,
-    initialNodeX: 0,
-    initialNodeY: 0,
+    initialPositions: new Map(),
   });
 
   // Initialize Data
@@ -278,19 +301,105 @@ export default function Home() {
     };
   }, []);
 
+  // Undo / Redo Key listener (Ctrl+Z and Ctrl+Shift+Z / Ctrl+Y)
+  useEffect(() => {
+    const handleUndoRedoKeys = async (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          // Redo
+          if (redoStackRef.current.length > 0) {
+            const nextState = redoStackRef.current.pop()!;
+            undoStackRef.current.push(JSON.parse(JSON.stringify(nodes)));
+            isUndoRedoActionRef.current = true;
+            await db.nodes.clear();
+            for (const n of nextState) {
+              await db.nodes.put(n);
+            }
+            setNodes(nextState);
+            if (isDriveConnected) {
+              for (const n of nextState) {
+                syncNodeToGoogleDrive(n);
+              }
+            }
+            isUndoRedoActionRef.current = false;
+          }
+        } else {
+          // Undo
+          if (undoStackRef.current.length > 0) {
+            const prevState = undoStackRef.current.pop()!;
+            redoStackRef.current.push(JSON.parse(JSON.stringify(nodes)));
+            isUndoRedoActionRef.current = true;
+            await db.nodes.clear();
+            for (const n of prevState) {
+              await db.nodes.put(n);
+            }
+            setNodes(prevState);
+            if (isDriveConnected) {
+              for (const n of prevState) {
+                syncNodeToGoogleDrive(n);
+              }
+            }
+            isUndoRedoActionRef.current = false;
+          }
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        // Redo alternative (Ctrl+Y)
+        e.preventDefault();
+        if (redoStackRef.current.length > 0) {
+          const nextState = redoStackRef.current.pop()!;
+          undoStackRef.current.push(JSON.parse(JSON.stringify(nodes)));
+          isUndoRedoActionRef.current = true;
+          await db.nodes.clear();
+          for (const n of nextState) {
+            await db.nodes.put(n);
+          }
+          setNodes(nextState);
+          if (isDriveConnected) {
+            for (const n of nextState) {
+              syncNodeToGoogleDrive(n);
+            }
+          }
+          isUndoRedoActionRef.current = false;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleUndoRedoKeys);
+    return () => window.removeEventListener('keydown', handleUndoRedoKeys);
+  }, [nodes, isDriveConnected]);
+
   // Card Dragging Implementation
   const handleStartDragNode = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    const node = nodes.find((n) => n.id === id);
-    if (!node) return;
+    // Record undo state before move begins
+    pushUndoSnapshot(nodes);
 
-    setSelectedNodeId(id);
+    const isAlreadySelected = selectedNodeIds.has(id);
+    const activeSelectedSet = isAlreadySelected ? selectedNodeIds : new Set([id]);
+    if (!isAlreadySelected) {
+      setSelectedNodeIds(activeSelectedSet);
+      setSelectedNodeId(id);
+    }
+
+    const posMap = new Map<string, { x: number; y: number }>();
+    for (const sId of activeSelectedSet) {
+      const n = nodes.find((item) => item.id === sId);
+      if (n) {
+        posMap.set(sId, { x: n.x, y: n.y });
+      }
+    }
+
     setDraggingNodeId(id);
     dragStartRef.current = {
       mouseX: e.clientX,
       mouseY: e.clientY,
-      initialNodeX: node.x,
-      initialNodeY: node.y,
+      initialPositions: posMap,
     };
   };
 
@@ -324,11 +433,15 @@ export default function Home() {
       const touch = e.touches[0];
       const deltaX = (touch.clientX - dragStartRef.current.mouseX) / viewport.zoom;
       const deltaY = (touch.clientY - dragStartRef.current.mouseY) / viewport.zoom;
-      const newX = dragStartRef.current.initialNodeX + deltaX;
-      const newY = dragStartRef.current.initialNodeY + deltaY;
 
       setNodes((prev) =>
-        prev.map((n) => (n.id === draggingNodeId ? { ...n, x: newX, y: newY } : n))
+        prev.map((n) => {
+          const initPos = dragStartRef.current.initialPositions.get(n.id);
+          if (initPos) {
+            return { ...n, x: initPos.x + deltaX, y: initPos.y + deltaY };
+          }
+          return n;
+        })
       );
     } else if (isPanning && e.touches.length === 1) {
       const touch = e.touches[0];
@@ -349,11 +462,14 @@ export default function Home() {
 
   const handleTouchEnd = async () => {
     if (draggingNodeId) {
-      const movedNode = nodes.find((n) => n.id === draggingNodeId);
-      if (movedNode) {
-        await db.nodes.update(movedNode.id, { x: movedNode.x, y: movedNode.y });
-        if (isDriveConnected) {
-          syncNodeToGoogleDrive(movedNode);
+      const movedIds = Array.from(dragStartRef.current.initialPositions.keys());
+      for (const id of movedIds) {
+        const movedNode = nodes.find((n) => n.id === id);
+        if (movedNode) {
+          await db.nodes.update(movedNode.id, { x: movedNode.x, y: movedNode.y });
+          if (isDriveConnected) {
+            syncNodeToGoogleDrive(movedNode);
+          }
         }
       }
       setDraggingNodeId(null);
@@ -367,40 +483,112 @@ export default function Home() {
     const node = nodes.find((n) => n.id === id);
     if (!node || !touch) return;
 
-    setSelectedNodeId(id);
+    pushUndoSnapshot(nodes);
+
+    const isAlreadySelected = selectedNodeIds.has(id);
+    const activeSelectedSet = isAlreadySelected ? selectedNodeIds : new Set([id]);
+    if (!isAlreadySelected) {
+      setSelectedNodeIds(activeSelectedSet);
+      setSelectedNodeId(id);
+    }
+
+    const posMap = new Map<string, { x: number; y: number }>();
+    for (const sId of activeSelectedSet) {
+      const n = nodes.find((item) => item.id === sId);
+      if (n) {
+        posMap.set(sId, { x: n.x, y: n.y });
+      }
+    }
+
     setDraggingNodeId(id);
     dragStartRef.current = {
       mouseX: touch.clientX,
       mouseY: touch.clientY,
-      initialNodeX: node.x,
-      initialNodeY: node.y,
+      initialPositions: posMap,
     };
   };
 
-  // Mouse Pan Handlers
+  // Mouse Handlers (Left Click Pan, Right Click Marquee Box Select, Card Group Drag)
   const handleMouseDown = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement | null;
+
+    // Right-Click (Button 2): Start Marquee Multi-Select Box
+    if (e.button === 2) {
+      e.preventDefault();
+      setIsSelectingMarquee(true);
+      setMarqueeBox({
+        startX: e.clientX,
+        startY: e.clientY,
+        currentX: e.clientX,
+        currentY: e.clientY,
+      });
+      return;
+    }
+
+    // Left Click: Clear selection if clicking empty canvas, or begin canvas pan
     if (
       target === canvasRef.current ||
       target?.classList.contains('canvas-bg-grid') ||
       e.button === 1 ||
       e.shiftKey
     ) {
-      setSelectedNodeId(null);
+      if (!e.shiftKey) {
+        setSelectedNodeId(null);
+        setSelectedNodeIds(new Set());
+      }
       setIsPanning(true);
       panStartRef.current = { x: e.clientX - viewport.x, y: e.clientY - viewport.y };
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (draggingNodeId) {
+    if (isSelectingMarquee && marqueeBox) {
+      setMarqueeBox((prev) => (prev ? { ...prev, currentX: e.clientX, currentY: e.clientY } : null));
+
+      // Calculate canvas bounds of marquee box
+      const minScreenX = Math.min(marqueeBox.startX, e.clientX);
+      const maxScreenX = Math.max(marqueeBox.startX, e.clientX);
+      const minScreenY = Math.min(marqueeBox.startY, e.clientY);
+      const maxScreenY = Math.max(marqueeBox.startY, e.clientY);
+
+      const canvasMinX = (minScreenX - viewport.x) / viewport.zoom;
+      const canvasMaxX = (maxScreenX - viewport.x) / viewport.zoom;
+      const canvasMinY = (minScreenY - viewport.y) / viewport.zoom;
+      const canvasMaxY = (maxScreenY - viewport.y) / viewport.zoom;
+
+      // Select all nodes that intersect the marquee box
+      const newlySelected = new Set<string>();
+      for (const node of nodes) {
+        const nodeW = node.width || 340;
+        const nodeH = node.height || 260;
+        const intersects =
+          node.x < canvasMaxX &&
+          node.x + nodeW > canvasMinX &&
+          node.y < canvasMaxY &&
+          node.y + nodeH > canvasMinY;
+
+        if (intersects) {
+          newlySelected.add(node.id);
+        }
+      }
+      setSelectedNodeIds(newlySelected);
+      if (newlySelected.size === 1) {
+        setSelectedNodeId(Array.from(newlySelected)[0]);
+      } else if (newlySelected.size === 0) {
+        setSelectedNodeId(null);
+      }
+    } else if (draggingNodeId) {
       const deltaX = (e.clientX - dragStartRef.current.mouseX) / viewport.zoom;
       const deltaY = (e.clientY - dragStartRef.current.mouseY) / viewport.zoom;
-      const newX = dragStartRef.current.initialNodeX + deltaX;
-      const newY = dragStartRef.current.initialNodeY + deltaY;
 
       setNodes((prev) =>
-        prev.map((n) => (n.id === draggingNodeId ? { ...n, x: newX, y: newY } : n))
+        prev.map((n) => {
+          const initPos = dragStartRef.current.initialPositions.get(n.id);
+          if (initPos) {
+            return { ...n, x: initPos.x + deltaX, y: initPos.y + deltaY };
+          }
+          return n;
+        })
       );
     } else if (isPanning) {
       const newX = e.clientX - panStartRef.current.x;
@@ -409,18 +597,31 @@ export default function Home() {
     }
   };
 
-  const handleMouseUp = async () => {
+  const handleMouseUp = async (e: React.MouseEvent) => {
+    if (isSelectingMarquee) {
+      setIsSelectingMarquee(false);
+      setMarqueeBox(null);
+    }
+
     if (draggingNodeId) {
-      const movedNode = nodes.find((n) => n.id === draggingNodeId);
-      if (movedNode) {
-        await db.nodes.update(movedNode.id, { x: movedNode.x, y: movedNode.y });
-        if (isDriveConnected) {
-          syncNodeToGoogleDrive(movedNode);
+      const movedIds = Array.from(dragStartRef.current.initialPositions.keys());
+      for (const id of movedIds) {
+        const movedNode = nodes.find((n) => n.id === id);
+        if (movedNode) {
+          await db.nodes.update(movedNode.id, { x: movedNode.x, y: movedNode.y });
+          if (isDriveConnected) {
+            syncNodeToGoogleDrive(movedNode);
+          }
         }
       }
       setDraggingNodeId(null);
     }
     setIsPanning(false);
+  };
+
+  // Prevent native browser context menu when right-clicking on canvas for marquee select
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
   };
 
   // Centers viewport so all nodes are comfortably visible on screen
@@ -514,12 +715,16 @@ export default function Home() {
   };
 
   const handleDeleteCategory = async (id: string) => {
+    const catToDelete = categories.find((c) => c.id === id);
     await db.categories.delete(id);
     setCategories((prev) => prev.filter((c) => c.id !== id));
 
     const affectedNodes = nodes.filter((n) => n.category === id);
     for (const node of affectedNodes) {
       await db.nodes.update(node.id, { category: 'general', updatedAt: Date.now() });
+      if (isDriveConnected) {
+        syncNodeToGoogleDrive({ ...node, category: 'general', updatedAt: Date.now() });
+      }
     }
 
     setNodes((prev) =>
@@ -529,18 +734,28 @@ export default function Home() {
     if (activeCategory === id) {
       setActiveCategory('all');
     }
+
+    if (isDriveConnected && catToDelete) {
+      trashCategoryOnGoogleDrive(catToDelete.name);
+    }
   };
 
   // Card Operations
   const handleDeleteNode = async (id: string) => {
     const nodeToDelete = nodes.find((n) => n.id === id);
     if (nodeToDelete) {
+      pushUndoSnapshot(nodes);
       setRecentlyDeleted(nodeToDelete);
       setShowUndoToast(true);
       setTimeout(() => setShowUndoToast(false), 6000);
 
       await db.nodes.delete(id);
       setNodes((prev) => prev.filter((n) => n.id !== id));
+      setSelectedNodeIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
 
       // Move to Google Drive native trash if connected
       if (isDriveConnected) {
@@ -586,9 +801,11 @@ export default function Home() {
       },
     };
 
+    pushUndoSnapshot(nodes);
     await db.nodes.put(newNode);
     setNodes((prev) => [...prev, newNode]);
     setSelectedNodeId(newNode.id);
+    setSelectedNodeIds(new Set([newNode.id]));
 
     // Sync to Google Drive if connected
     if (isDriveConnected) {
@@ -667,6 +884,7 @@ export default function Home() {
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
+      onContextMenu={handleContextMenu}
       onWheel={handleWheel}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -718,7 +936,7 @@ export default function Home() {
             return false;
           })();
 
-          const isSelected = selectedNodeId === node.id;
+          const isSelected = selectedNodeId === node.id || selectedNodeIds.has(node.id);
           return (
             <div
               key={node.id}
@@ -739,6 +957,16 @@ export default function Home() {
                 onSelect={(e) => {
                   e.stopPropagation();
                   setSelectedNodeId(node.id);
+                  if (e.shiftKey) {
+                    setSelectedNodeIds((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(node.id)) next.delete(node.id);
+                      else next.add(node.id);
+                      return next;
+                    });
+                  } else {
+                    setSelectedNodeIds(new Set([node.id]));
+                  }
                 }}
                 onDelete={handleDeleteNode}
                 onUpdate={handleUpdateNode}
@@ -749,6 +977,25 @@ export default function Home() {
           );
         })}
       </div>
+
+      {/* Right-Click Marquee Drag Multi-Selection Box */}
+      {isSelectingMarquee && marqueeBox && (
+        <div
+          style={{
+            position: 'fixed',
+            left: `${Math.min(marqueeBox.startX, marqueeBox.currentX)}px`,
+            top: `${Math.min(marqueeBox.startY, marqueeBox.currentY)}px`,
+            width: `${Math.abs(marqueeBox.currentX - marqueeBox.startX)}px`,
+            height: `${Math.abs(marqueeBox.currentY - marqueeBox.startY)}px`,
+            backgroundColor: 'rgba(200, 16, 46, 0.12)',
+            border: '1.5px dashed var(--liverpool)',
+            borderRadius: '8px',
+            pointerEvents: 'none',
+            zIndex: 60,
+            boxShadow: '0 0 12px var(--liverpool-glow)',
+          }}
+        />
+      )}
 
       {/* Unified Bottom-Center Glass Dock */}
       <CategoryDock

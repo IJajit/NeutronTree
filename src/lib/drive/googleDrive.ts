@@ -538,3 +538,59 @@ export async function trashNodeOnGoogleDrive(nodeId: string, nodeTitle?: string)
     return false;
   }
 }
+
+/**
+ * Moves all files associated with a category to a new category folder or trashes the folder
+ */
+export async function moveCategoryOnGoogleDrive(oldCategoryName: string, newCategoryName: string): Promise<void> {
+  const token = getStoredAccessToken();
+  if (!token) return;
+
+  try {
+    const rootFolderId = await getOrCreateDriveFolder('NeuronTree');
+    const oldFolderId = await getOrCreateDriveFolder(oldCategoryName, rootFolderId);
+    // Rename old folder
+    await fetch(`https://www.googleapis.com/drive/v3/files/${oldFolderId}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name: newCategoryName }),
+    });
+  } catch (err) {
+    console.warn('Google Drive category rename error:', err);
+  }
+}
+
+/**
+ * Trashes a category folder and its contents on Google Drive
+ */
+export async function trashCategoryOnGoogleDrive(categoryName: string): Promise<void> {
+  const token = getStoredAccessToken();
+  if (!token) return;
+
+  try {
+    const rootFolderId = await getOrCreateDriveFolder('NeuronTree');
+    const searchRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+        `name = '${categoryName}' and '${rootFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`
+      )}&fields=files(id)`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const searchData = await searchRes.json();
+    const folderId = searchData.files?.[0]?.id;
+    if (folderId) {
+      await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ trashed: true }),
+      });
+    }
+  } catch (err) {
+    console.warn('Google Drive trash category error:', err);
+  }
+}
