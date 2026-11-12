@@ -239,7 +239,85 @@ export default function Home() {
     };
   };
 
-  // Pan Handlers
+  // Touch Handlers for Mobile & Tablet Canvas Navigation
+  const touchStartDistRef = useRef<number | null>(null);
+  const touchStartZoomRef = useRef<number>(1);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      if (e.target === canvasRef.current) {
+        setSelectedNodeId(null);
+        setIsPanning(true);
+        panStartRef.current = { x: touch.clientX - viewport.x, y: touch.clientY - viewport.y };
+      }
+    } else if (e.touches.length === 2) {
+      // Pinch to Zoom
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      touchStartDistRef.current = dist;
+      touchStartZoomRef.current = viewport.zoom;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (draggingNodeId && e.touches.length === 1) {
+      const touch = e.touches[0];
+      const deltaX = (touch.clientX - dragStartRef.current.mouseX) / viewport.zoom;
+      const deltaY = (touch.clientY - dragStartRef.current.mouseY) / viewport.zoom;
+      const newX = dragStartRef.current.initialNodeX + deltaX;
+      const newY = dragStartRef.current.initialNodeY + deltaY;
+
+      setNodes((prev) =>
+        prev.map((n) => (n.id === draggingNodeId ? { ...n, x: newX, y: newY } : n))
+      );
+    } else if (isPanning && e.touches.length === 1) {
+      const touch = e.touches[0];
+      const newX = touch.clientX - panStartRef.current.x;
+      const newY = touch.clientY - panStartRef.current.y;
+      setViewport((prev) => ({ ...prev, x: newX, y: newY }));
+    } else if (e.touches.length === 2 && touchStartDistRef.current) {
+      // Pinch zoom handling
+      const currentDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const scale = currentDist / touchStartDistRef.current;
+      const newZoom = Math.min(Math.max(0.2, touchStartZoomRef.current * scale), 2.5);
+      setViewport((prev) => ({ ...prev, zoom: newZoom }));
+    }
+  };
+
+  const handleTouchEnd = async () => {
+    if (draggingNodeId) {
+      const movedNode = nodes.find((n) => n.id === draggingNodeId);
+      if (movedNode) {
+        await db.nodes.update(movedNode.id, { x: movedNode.x, y: movedNode.y });
+      }
+      setDraggingNodeId(null);
+    }
+    setIsPanning(false);
+    touchStartDistRef.current = null;
+  };
+
+  const handleStartDragNodeTouch = (e: React.TouchEvent, id: string) => {
+    const touch = e.touches[0];
+    const node = nodes.find((n) => n.id === id);
+    if (!node || !touch) return;
+
+    setSelectedNodeId(id);
+    setDraggingNodeId(id);
+    dragStartRef.current = {
+      mouseX: touch.clientX,
+      mouseY: touch.clientY,
+      initialNodeX: node.x,
+      initialNodeY: node.y,
+    };
+  };
+
+  // Mouse Pan Handlers
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.target === canvasRef.current || e.button === 1 || e.shiftKey) {
       setSelectedNodeId(null);
@@ -325,11 +403,12 @@ export default function Home() {
     }
   };
 
-  const handleAddCategory = async (name: string) => {
-    const id = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const handleAddCategory = async (name: string, parentId?: string) => {
+    const rawId = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     const newCat: Category = {
-      id: id || `cat-${Date.now()}`,
+      id: rawId ? (parentId ? `${parentId}-${rawId}` : rawId) : `cat-${Date.now()}`,
       name,
+      parentId,
       order: categories.length,
     };
     await db.categories.put(newCat);
@@ -368,7 +447,7 @@ export default function Home() {
 
       // Move to Google Drive native trash if connected
       if (isDriveConnected) {
-        trashNodeOnGoogleDrive(id);
+        trashNodeOnGoogleDrive(id, nodeToDelete.data.title || nodeToDelete.data.fileName);
       }
     }
   };
@@ -448,6 +527,9 @@ export default function Home() {
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onWheel={handleWheel}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       style={{
         position: 'relative',
         width: '100vw',
@@ -456,6 +538,7 @@ export default function Home() {
         backgroundColor: 'var(--background)',
         cursor: 'default',
         userSelect: 'none',
+        touchAction: 'none',
       }}
     >
       {/* Background Dot Matrix Grid */}
@@ -509,6 +592,7 @@ export default function Home() {
                 onDelete={handleDeleteNode}
                 onUpdate={handleUpdateNode}
                 onStartDrag={handleStartDragNode}
+                onTouchStartDrag={handleStartDragNodeTouch}
               />
             </div>
           );

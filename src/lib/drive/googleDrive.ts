@@ -367,27 +367,33 @@ export async function syncNodeToGoogleDrive(node: BlockNode): Promise<string | n
 }
 
 /**
- * Moves a node file to native Google Drive Trash (Recycle Bin)
+ * Moves a node file and its associated media asset to native Google Drive Trash (Recycle Bin)
  */
-export async function trashNodeOnGoogleDrive(nodeId: string): Promise<boolean> {
+export async function trashNodeOnGoogleDrive(nodeId: string, nodeTitle?: string): Promise<boolean> {
   const token = getStoredAccessToken();
   if (!token) return false;
 
   try {
-    const fileName = `${nodeId}.json`;
+    const cleanTitle = (nodeTitle || '').replace(/[\\/:*?"<>|]/g, '_').trim();
+    const queryParts = [`name contains '${nodeId}'`];
+    if (cleanTitle) {
+      queryParts.push(`name contains '${cleanTitle}'`);
+    }
+
     const searchRes = await fetch(
       `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
-        `name = '${fileName}' and trashed = false`
-      )}&fields=files(id)`,
+        `(${queryParts.join(' or ')}) and trashed = false`
+      )}&fields=files(id, name)`,
       {
         headers: { Authorization: `Bearer ${token}` },
       }
     );
 
     const searchData = await searchRes.json();
-    const fileId = searchData.files?.[0]?.id;
-    if (fileId) {
-      await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+    const files = searchData.files || [];
+
+    for (const file of files) {
+      await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -395,9 +401,9 @@ export async function trashNodeOnGoogleDrive(nodeId: string): Promise<boolean> {
         },
         body: JSON.stringify({ trashed: true }),
       });
-      return true;
     }
-    return false;
+
+    return files.length > 0;
   } catch (err) {
     console.warn('Google Drive trash error:', err);
     return false;

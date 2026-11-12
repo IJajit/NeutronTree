@@ -3,6 +3,7 @@ export type MediaType = 'image' | 'link' | 'note' | 'document' | 'video';
 export interface Category {
   id: string;
   name: string;
+  parentId?: string; // If set, this category is a subcategory of parentId
   color?: string;
   description?: string;
   order: number;

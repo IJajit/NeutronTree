@@ -218,11 +218,15 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                 outline: 'none',
               }}
             >
-              {categories.map((c) => (
-                <option key={c.id} value={c.id} style={{ backgroundColor: '#181818', color: '#ffffff' }}>
-                  {c.name}
-                </option>
-              ))}
+              {categories.map((c) => {
+                const parent = c.parentId ? categories.find((p) => p.id === c.parentId) : null;
+                const displayName = parent ? `${parent.name} → ${c.name}` : c.name;
+                return (
+                  <option key={c.id} value={c.id} style={{ backgroundColor: '#181818', color: '#ffffff' }}>
+                    {displayName}
+                  </option>
+                );
+              })}
             </select>
           </div>
 

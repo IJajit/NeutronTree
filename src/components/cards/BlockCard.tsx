@@ -16,10 +16,11 @@ interface BlockCardProps {
   node: BlockNode;
   categories: Category[];
   isSelected: boolean;
-  onSelect: (e: React.MouseEvent) => void;
+  onSelect: (e: React.MouseEvent | React.TouchEvent) => void;
   onDelete: (id: string) => void;
   onUpdate: (id: string, partial: Partial<BlockNode>) => void;
   onStartDrag: (e: React.MouseEvent, id: string) => void;
+  onTouchStartDrag?: (e: React.TouchEvent, id: string) => void;
 }
 
 export const BlockCard: React.FC<BlockCardProps> = ({
@@ -30,6 +31,7 @@ export const BlockCard: React.FC<BlockCardProps> = ({
   onDelete,
   onUpdate,
   onStartDrag,
+  onTouchStartDrag,
 }) => {
   const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -114,11 +116,30 @@ export const BlockCard: React.FC<BlockCardProps> = ({
     alignItems: 'center',
   };
 
+  const handleTouchStartCard = (e: React.TouchEvent) => {
+    if (isEditing) return;
+    const target = e.target as HTMLElement;
+    if (
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.tagName === 'SELECT' ||
+      target.tagName === 'BUTTON' ||
+      target.closest('button') ||
+      target.closest('.no-drag')
+    ) {
+      return;
+    }
+    if (onTouchStartDrag) {
+      onTouchStartDrag(e, node.id);
+    }
+  };
+
   return (
     <div
       onMouseDown={handleMouseDownCard}
+      onTouchStart={handleTouchStartCard}
       onClick={onSelect}
-      className={`card-body-shell group relative flex flex-col select-none ${
+      className={`card-body-shell group relative flex flex-col select-none touch-manipulation ${
         isEditing ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'
       }`}
       style={{
@@ -261,11 +282,15 @@ export const BlockCard: React.FC<BlockCardProps> = ({
               <option value="general" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-main)' }}>
                 No Category (Default)
               </option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id} style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-main)' }}>
-                  {c.name}
-                </option>
-              ))}
+              {categories.map((c) => {
+                const parent = c.parentId ? categories.find((p) => p.id === c.parentId) : null;
+                const displayName = parent ? `${parent.name} → ${c.name}` : c.name;
+                return (
+                  <option key={c.id} value={c.id} style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-main)' }}>
+                    {displayName}
+                  </option>
+                );
+              })}
             </select>
             {/* Custom centered chevron arrow matching left/right inset */}
             <div
@@ -476,7 +501,15 @@ export const BlockCard: React.FC<BlockCardProps> = ({
         }}
       >
         <span style={{ textTransform: 'capitalize', color: 'var(--text-muted)', letterSpacing: '0.01em' }}>
-          {categories.find((c) => c.id === node.category)?.name || (node.category === 'general' ? 'No Category' : 'No Category')}
+          {(() => {
+            const cat = categories.find((c) => c.id === node.category);
+            if (!cat) return 'No Category';
+            if (cat.parentId) {
+              const parent = categories.find((c) => c.id === cat.parentId);
+              return parent ? `${parent.name} / ${cat.name}` : cat.name;
+            }
+            return cat.name;
+          })()}
         </span>
         <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
           {new Date(node.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
