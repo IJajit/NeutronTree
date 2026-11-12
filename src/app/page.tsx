@@ -345,6 +345,9 @@ export default function Home() {
       const movedNode = nodes.find((n) => n.id === draggingNodeId);
       if (movedNode) {
         await db.nodes.update(movedNode.id, { x: movedNode.x, y: movedNode.y });
+        if (isDriveConnected) {
+          syncNodeToGoogleDrive(movedNode);
+        }
       }
       setDraggingNodeId(null);
     }
@@ -398,6 +401,9 @@ export default function Home() {
       const movedNode = nodes.find((n) => n.id === draggingNodeId);
       if (movedNode) {
         await db.nodes.update(movedNode.id, { x: movedNode.x, y: movedNode.y });
+        if (isDriveConnected) {
+          syncNodeToGoogleDrive(movedNode);
+        }
       }
       setDraggingNodeId(null);
     }

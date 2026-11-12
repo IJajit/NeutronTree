@@ -267,14 +267,14 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
       <nav
         className="glass-dock-bar"
         style={{
-          padding: '6px 14px',
-          gap: '8px',
+          padding: '6px 16px',
+          gap: '6px',
         }}
       >
         {/* Manage Categories Popover Button */}
         <button
           onClick={() => setShowCategoryPopover(!showCategoryPopover)}
-          className="glass-circle-btn touch-manipulation min-w-[38px] min-h-[38px]"
+          className="glass-circle-btn touch-manipulation min-w-[34px] min-h-[34px]"
           title="Categories Manager"
         >
           <SlidersHorizontal className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
@@ -283,13 +283,13 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
         {/* 'All' Universal Canvas Filter */}
         <button
           onClick={() => onSelectCategory('all')}
-          className={`filter-pill relative touch-manipulation min-h-[36px] ${activeCategory === 'all' ? 'active' : ''}`}
+          className={`filter-pill relative touch-manipulation min-h-[34px] ${activeCategory === 'all' ? 'active' : ''}`}
         >
           <span>All</span>
         </button>
 
         {/* Top-Level Categories with Click / Hover Subcategory flyouts */}
-        <div className="flex items-center gap-1.5 overflow-x-auto max-w-[48vw] no-native-scrollbar py-0.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto max-w-[34vw] md:max-w-[48vw] no-native-scrollbar py-0.5">
           {topCategories.map((cat) => {
             const subs = getSubcategories(cat.id);
             const isTopActive = activeCategory === cat.id;
@@ -432,10 +432,10 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
 
         <div className="w-[1px] h-4 mx-1 shrink-0" style={{ backgroundColor: 'var(--border)' }} />
 
-        {/* Direct Individual Media Buttons - with 42px touch target */}
+        {/* Direct Individual Media Buttons - with compact touch target */}
         <button
           onClick={() => onOpenQuickAddType('link')}
-          className="glass-circle-btn touch-manipulation min-w-[38px] min-h-[38px]"
+          className="glass-circle-btn touch-manipulation min-w-[34px] min-h-[34px]"
           title="Add Link / Bookmark"
         >
           <Link className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
@@ -443,7 +443,7 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
 
         <button
           onClick={() => onOpenQuickAddType('note')}
-          className="glass-circle-btn touch-manipulation min-w-[38px] min-h-[38px]"
+          className="glass-circle-btn touch-manipulation min-w-[34px] min-h-[34px]"
           title="Add Note"
         >
           <Type className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
@@ -451,7 +451,7 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
 
         <button
           onClick={() => onOpenQuickAddType('image')}
-          className="glass-circle-btn touch-manipulation min-w-[38px] min-h-[38px]"
+          className="glass-circle-btn touch-manipulation min-w-[34px] min-h-[34px]"
           title="Add Image"
         >
           <Image className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
@@ -459,7 +459,7 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
 
         <button
           onClick={() => onOpenQuickAddType('document')}
-          className="glass-circle-btn touch-manipulation min-w-[38px] min-h-[38px]"
+          className="glass-circle-btn touch-manipulation min-w-[34px] min-h-[34px]"
           title="Add PDF / Document"
         >
           <FileText className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
@@ -467,7 +467,7 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
 
         <button
           onClick={() => onOpenQuickAddType('video')}
-          className="glass-circle-btn touch-manipulation min-w-[38px] min-h-[38px]"
+          className="glass-circle-btn touch-manipulation min-w-[34px] min-h-[34px]"
           title="Add Video"
         >
           <Video className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
@@ -478,7 +478,7 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
         {/* Google Drive Button */}
         <button
           onClick={onOpenDriveModal}
-          className="glass-circle-btn touch-manipulation min-w-[38px] min-h-[38px]"
+          className="glass-circle-btn touch-manipulation min-w-[34px] min-h-[34px]"
           title={isDriveConnected ? 'Google Drive Synced' : 'Google Drive Backup'}
         >
           <Cloud className={`w-4 h-4 ${isDriveConnected ? 'text-emerald-500' : ''}`} style={{ color: isDriveConnected ? undefined : 'var(--text-muted)' }} />
