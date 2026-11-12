@@ -221,9 +221,15 @@ export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
             </div>
           )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '11px' }}>
-            <Info className="w-3.5 h-3.5 text-[var(--liverpool)] shrink-0" />
-            <span>Authorized Origin: <code style={{ color: 'var(--text-main)' }}>https://neutrontree.vercel.app</code></span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', color: 'var(--text-muted)', fontSize: '11px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Info className="w-3.5 h-3.5 text-[var(--liverpool)] shrink-0" />
+              <span><strong>Authorized JavaScript Origin:</strong> <code style={{ color: 'var(--text-main)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px' }}>https://neutrontree.vercel.app</code></span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Info className="w-3.5 h-3.5 text-[var(--liverpool)] shrink-0" />
+              <span><strong>Authorized Redirect URI:</strong> <code style={{ color: 'var(--text-main)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px' }}>https://neutrontree.vercel.app</code></span>
+            </div>
           </div>
 
           <div

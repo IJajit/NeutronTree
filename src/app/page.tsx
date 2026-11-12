@@ -34,6 +34,7 @@ export default function Home() {
   const [quickAddInitialType, setQuickAddInitialType] = useState<MediaType>('link');
   const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
   const [isDriveConnected, setIsDriveConnected] = useState(false);
+  const [isSyncingDrive, setIsSyncingDrive] = useState(false);
   const [recentlyDeleted, setRecentlyDeleted] = useState<BlockNode | null>(null);
   const [showUndoToast, setShowUndoToast] = useState(false);
 
@@ -571,6 +572,49 @@ export default function Home() {
     );
   };
 
+  const handleManualSyncWithDrive = async () => {
+    if (!isDriveConnected) {
+      setIsDriveModalOpen(true);
+      return;
+    }
+    setIsSyncingDrive(true);
+    try {
+      const [driveNodes, cloudMeta] = await Promise.all([
+        pullNodesFromGoogleDrive(),
+        pullBoardStateFromDrive(),
+      ]);
+
+      if (driveNodes.length > 0) {
+        await db.nodes.clear();
+        for (const dNode of driveNodes) {
+          await db.nodes.put(dNode);
+        }
+        const updatedNodes = await db.nodes.toArray();
+        setNodes(updatedNodes);
+      }
+
+      if (cloudMeta) {
+        if (cloudMeta.categories && cloudMeta.categories.length > 0) {
+          await db.categories.clear();
+          for (const c of cloudMeta.categories) {
+            await db.categories.put(c);
+          }
+          setCategories(cloudMeta.categories);
+        }
+        if (cloudMeta.viewport) {
+          setViewport(cloudMeta.viewport);
+        }
+        if (cloudMeta.activeCategory) {
+          setActiveCategory(cloudMeta.activeCategory);
+        }
+      }
+    } catch (err) {
+      console.warn('Manual sync error:', err);
+    } finally {
+      setIsSyncingDrive(false);
+    }
+  };
+
   const handleOpenDirectType = (type: MediaType) => {
     setQuickAddInitialType(type);
     setIsQuickAddOpen(true);
@@ -674,6 +718,8 @@ export default function Home() {
         onDeleteCategory={handleDeleteCategory}
         onOpenQuickAddType={handleOpenDirectType}
         onOpenDriveModal={() => setIsDriveModalOpen(true)}
+        onSyncWithDrive={handleManualSyncWithDrive}
+        isSyncing={isSyncingDrive}
       />
 
       {/* Bottom-Left Controls: Theme Toggle + Zoom Controls */}

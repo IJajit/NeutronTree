@@ -22,6 +22,8 @@ interface CategoryDockProps {
   onDeleteCategory: (id: string) => void;
   onOpenQuickAddType: (type: MediaType) => void;
   onOpenDriveModal: () => void;
+  onSyncWithDrive?: () => void;
+  isSyncing?: boolean;
 }
 
 export const CategoryDock: React.FC<CategoryDockProps> = ({
@@ -33,6 +35,8 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
   onDeleteCategory,
   onOpenQuickAddType,
   onOpenDriveModal,
+  onSyncWithDrive,
+  isSyncing,
 }) => {
   const [showCategoryPopover, setShowCategoryPopover] = useState(false);
   const [newCatName, setNewCatName] = useState('');
@@ -266,15 +270,11 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
       {/* Main Glass Dock */}
       <nav
         className="glass-dock-bar"
-        style={{
-          padding: '6px 16px',
-          gap: '6px',
-        }}
       >
         {/* Manage Categories Popover Button */}
         <button
           onClick={() => setShowCategoryPopover(!showCategoryPopover)}
-          className="glass-circle-btn touch-manipulation min-w-[34px] min-h-[34px]"
+          className="glass-circle-btn touch-manipulation"
           title="Categories Manager"
         >
           <SlidersHorizontal className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
@@ -283,7 +283,7 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
         {/* 'All' Universal Canvas Filter */}
         <button
           onClick={() => onSelectCategory('all')}
-          className={`filter-pill relative touch-manipulation min-h-[34px] ${activeCategory === 'all' ? 'active' : ''}`}
+          className={`filter-pill relative touch-manipulation ${activeCategory === 'all' ? 'active' : ''}`}
         >
           <span>All</span>
         </button>
@@ -435,7 +435,7 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
         {/* Direct Individual Media Buttons - with compact touch target */}
         <button
           onClick={() => onOpenQuickAddType('link')}
-          className="glass-circle-btn touch-manipulation min-w-[34px] min-h-[34px]"
+          className="glass-circle-btn touch-manipulation"
           title="Add Link / Bookmark"
         >
           <Link className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
@@ -443,7 +443,7 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
 
         <button
           onClick={() => onOpenQuickAddType('note')}
-          className="glass-circle-btn touch-manipulation min-w-[34px] min-h-[34px]"
+          className="glass-circle-btn touch-manipulation"
           title="Add Note"
         >
           <Type className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
@@ -451,7 +451,7 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
 
         <button
           onClick={() => onOpenQuickAddType('image')}
-          className="glass-circle-btn touch-manipulation min-w-[34px] min-h-[34px]"
+          className="glass-circle-btn touch-manipulation"
           title="Add Image"
         >
           <Image className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
@@ -459,7 +459,7 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
 
         <button
           onClick={() => onOpenQuickAddType('document')}
-          className="glass-circle-btn touch-manipulation min-w-[34px] min-h-[34px]"
+          className="glass-circle-btn touch-manipulation"
           title="Add PDF / Document"
         >
           <FileText className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
@@ -467,7 +467,7 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
 
         <button
           onClick={() => onOpenQuickAddType('video')}
-          className="glass-circle-btn touch-manipulation min-w-[34px] min-h-[34px]"
+          className="glass-circle-btn touch-manipulation"
           title="Add Video"
         >
           <Video className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
@@ -475,13 +475,16 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
 
         <div className="w-[1px] h-4 mx-1 shrink-0" style={{ backgroundColor: 'var(--border)' }} />
 
-        {/* Google Drive Button */}
+        {/* Google Drive Button & Direct Cloud Sync Button */}
         <button
-          onClick={onOpenDriveModal}
-          className="glass-circle-btn touch-manipulation min-w-[34px] min-h-[34px]"
-          title={isDriveConnected ? 'Google Drive Synced' : 'Google Drive Backup'}
+          onClick={onSyncWithDrive || onOpenDriveModal}
+          className="glass-circle-btn touch-manipulation"
+          title={isDriveConnected ? 'Click to Sync with Google Drive' : 'Connect Google Drive'}
         >
-          <Cloud className={`w-4 h-4 ${isDriveConnected ? 'text-emerald-500' : ''}`} style={{ color: isDriveConnected ? undefined : 'var(--text-muted)' }} />
+          <Cloud
+            className={`w-4 h-4 ${isDriveConnected ? 'text-emerald-500' : ''} ${isSyncing ? 'animate-pulse' : ''}`}
+            style={{ color: isDriveConnected ? undefined : 'var(--text-muted)' }}
+          />
         </button>
       </nav>
     </div>
