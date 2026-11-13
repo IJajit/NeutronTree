@@ -691,24 +691,53 @@ export async function trashNodeOnGoogleDrive(nodeId: string, nodeTitle?: string)
 }
 
 /**
- * Moves all files associated with a category to a new category folder or trashes the folder
+ * Renames a category folder on Google Drive and updates the board meta file
  */
-export async function moveCategoryOnGoogleDrive(oldCategoryName: string, newCategoryName: string): Promise<void> {
+export async function renameCategoryOnGoogleDrive(
+  oldName: string,
+  newName: string,
+  parentId?: string,
+  categories?: Category[]
+): Promise<void> {
   const token = getStoredAccessToken();
   if (!token) return;
 
   try {
     const rootFolderId = await getOrCreateDriveFolder('NeuronTree');
-    const oldFolderId = await getOrCreateDriveFolder(oldCategoryName, rootFolderId);
-    // Rename old folder
-    await authenticatedFetch(`https://www.googleapis.com/drive/v3/files/${oldFolderId}`, {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ name: newCategoryName }),
-    });
+    let parentFolderId = rootFolderId;
+
+    if (parentId && categories) {
+      const parentCat = categories.find((c) => c.id === parentId);
+      if (parentCat) {
+        parentFolderId = await getOrCreateDriveFolder(parentCat.name.replace(/[\\/:*?"<>|]/g, '_').trim(), rootFolderId);
+      }
+    }
+
+    // Search for existing folder with oldName
+    const searchRes = await authenticatedFetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+        `name = '${oldName.replace(/'/g, "\\'")}' and '${parentFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`
+      )}&fields=files(id)`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    if (searchRes.ok) {
+      const searchData = await searchRes.json();
+      const folderId = searchData.files?.[0]?.id;
+      if (folderId) {
+        await authenticatedFetch(`https://www.googleapis.com/drive/v3/files/${folderId}`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name: newName.replace(/[\\/:*?"<>|]/g, '_').trim() }),
+        });
+      }
+    }
+
+    // Clear folder cache so subsequent operations use the updated folder
+    clearFolderIdCache();
   } catch (err) {
     console.warn('Google Drive category rename error:', err);
   }

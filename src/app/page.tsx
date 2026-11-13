@@ -14,6 +14,7 @@ import {
   syncNodeToGoogleDrive,
   trashNodeOnGoogleDrive,
   trashCategoryOnGoogleDrive,
+  renameCategoryOnGoogleDrive,
   handleOAuthRedirectResponse,
   pullNodesFromGoogleDrive,
   syncBoardStateToDrive,
@@ -857,6 +858,28 @@ export default function Home() {
     setActiveCategory(newCat.id);
   };
 
+  const handleRenameCategory = async (id: string, newName: string) => {
+    const catToRename = categories.find((c) => c.id === id);
+    if (!catToRename || !newName.trim()) return;
+
+    const oldName = catToRename.name;
+    const updatedCategories = categories.map((c) => (c.id === id ? { ...c, name: newName.trim() } : c));
+    await db.categories.update(id, { name: newName.trim() });
+    setCategories(updatedCategories);
+
+    if (isDriveConnected) {
+      // 1. Rename folder on Google Drive
+      await renameCategoryOnGoogleDrive(oldName, newName.trim(), catToRename.parentId, updatedCategories);
+      // 2. Resync updated board state metadata
+      syncBoardStateToDrive({
+        categories: updatedCategories,
+        viewport,
+        activeCategory,
+        updatedAt: Date.now(),
+      });
+    }
+  };
+
   const handleDeleteCategory = async (id: string) => {
     const catToDelete = categories.find((c) => c.id === id);
     const remainingCats = categories.filter((c) => c.id !== id);
@@ -1184,6 +1207,7 @@ export default function Home() {
         isDriveConnected={isDriveConnected}
         onSelectCategory={handleSelectCategory}
         onAddCategory={handleAddCategory}
+        onRenameCategory={handleRenameCategory}
         onDeleteCategory={handleDeleteCategory}
         onOpenQuickAddType={handleOpenDirectType}
         onOpenDriveModal={() => setIsDriveModalOpen(true)}

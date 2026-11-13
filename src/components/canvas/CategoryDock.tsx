@@ -13,7 +13,9 @@ import {
   Smartphone,
   Search,
   Eye,
-  RefreshCw
+  RefreshCw,
+  Edit2,
+  Check
 } from 'lucide-react';
 import { Category, MediaType } from '@/lib/types/canvas';
 
@@ -23,6 +25,7 @@ interface CategoryDockProps {
   isDriveConnected: boolean;
   onSelectCategory: (id: string) => void;
   onAddCategory: (name: string, parentId?: string) => void;
+  onRenameCategory?: (id: string, newName: string) => void;
   onDeleteCategory: (id: string) => void;
   onOpenQuickAddType: (type: MediaType) => void;
   onOpenDriveModal: () => void;
@@ -44,6 +47,7 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
   isDriveConnected,
   onSelectCategory,
   onAddCategory,
+  onRenameCategory,
   onDeleteCategory,
   onOpenQuickAddType,
   onOpenDriveModal,
@@ -69,6 +73,28 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
   };
   const [newCatName, setNewCatName] = useState('');
   const [selectedParentId, setSelectedParentId] = useState<string>('');
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [editingCatName, setEditingCatName] = useState('');
+
+  const handleStartRename = (e: React.MouseEvent, id: string, currentName: string) => {
+    e.stopPropagation();
+    setEditingCatId(id);
+    setEditingCatName(currentName);
+  };
+
+  const handleSaveRename = (e: React.MouseEvent | React.FormEvent, id: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (editingCatName.trim() && onRenameCategory) {
+      onRenameCategory(id, editingCatName.trim());
+    }
+    setEditingCatId(null);
+  };
+
+  const handleCancelRename = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingCatId(null);
+  };
   const [hoveredCatId, setHoveredCatId] = useState<string | null>(null);
   const hoverTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
@@ -174,25 +200,76 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
                       fontSize: '12px',
                       color: activeCategory === cat.id ? '#ffffff' : 'var(--text-main)',
                       fontWeight: activeCategory === cat.id ? 600 : 400,
+                      gap: '8px',
                     }}
                   >
-                    <span
-                      style={{ cursor: 'pointer', flex: 1 }}
-                      onClick={() => {
-                        onSelectCategory(cat.id);
-                        setShowCategoryPopover(false);
-                      }}
-                    >
-                      {cat.name}
-                    </span>
-                    {!isMobileViewer && (
-                      <button
-                        onClick={() => onDeleteCategory(cat.id)}
-                        style={{ background: 'none', border: 'none', color: '#777', cursor: 'pointer', padding: '4px' }}
-                        title={`Delete ${cat.name}`}
-                      >
-                        <X className="w-3.5 h-3.5 hover:text-red-400" />
-                      </button>
+                    {editingCatId === cat.id ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
+                        <input
+                          type="text"
+                          value={editingCatName}
+                          onChange={(e) => setEditingCatName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveRename(e, cat.id);
+                            if (e.key === 'Escape') setEditingCatId(null);
+                          }}
+                          autoFocus
+                          style={{
+                            flex: 1,
+                            backgroundColor: 'var(--input-bg)',
+                            border: '1px solid var(--liverpool)',
+                            borderRadius: '6px',
+                            padding: '3px 8px',
+                            fontSize: '12px',
+                            color: '#fff',
+                            outline: 'none',
+                          }}
+                        />
+                        <button
+                          onClick={(e) => handleSaveRename(e, cat.id)}
+                          style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', padding: '2px' }}
+                          title="Save name"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={handleCancelRename}
+                          style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '2px' }}
+                          title="Cancel"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <span
+                          style={{ cursor: 'pointer', flex: 1 }}
+                          onClick={() => {
+                            onSelectCategory(cat.id);
+                            setShowCategoryPopover(false);
+                          }}
+                        >
+                          {cat.name}
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <button
+                            onClick={(e) => handleStartRename(e, cat.id, cat.name)}
+                            style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '4px' }}
+                            title={`Rename ${cat.name}`}
+                          >
+                            <Edit2 className="w-3 h-3 hover:text-white" />
+                          </button>
+                          {!isMobileViewer && (
+                            <button
+                              onClick={() => onDeleteCategory(cat.id)}
+                              style={{ background: 'none', border: 'none', color: '#777', cursor: 'pointer', padding: '4px' }}
+                              title={`Delete ${cat.name}`}
+                            >
+                              <X className="w-3.5 h-3.5 hover:text-red-400" />
+                            </button>
+                          )}
+                        </div>
+                      </>
                     )}
                   </div>
 
@@ -209,26 +286,78 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
                         backgroundColor: activeCategory === sub.id ? 'rgba(255, 255, 255, 0.09)' : 'transparent',
                         fontSize: '11px',
                         color: activeCategory === sub.id ? '#fff' : 'var(--text-muted)',
+                        gap: '6px',
                       }}
                     >
-                      <div
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', flex: 1 }}
-                        onClick={() => {
-                          onSelectCategory(sub.id);
-                          setShowCategoryPopover(false);
-                        }}
-                      >
-                        <CornerDownRight className="w-3 h-3 text-gray-500" />
-                        <span>{sub.name}</span>
-                      </div>
-                      {!isMobileViewer && (
-                        <button
-                          onClick={() => onDeleteCategory(sub.id)}
-                          style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: '2px' }}
-                          title={`Delete ${sub.name}`}
-                        >
-                          <X className="w-3 h-3 hover:text-red-400" />
-                        </button>
+                      {editingCatId === sub.id ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
+                          <CornerDownRight className="w-3 h-3 text-gray-500 shrink-0" />
+                          <input
+                            type="text"
+                            value={editingCatName}
+                            onChange={(e) => setEditingCatName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveRename(e, sub.id);
+                              if (e.key === 'Escape') setEditingCatId(null);
+                            }}
+                            autoFocus
+                            style={{
+                              flex: 1,
+                              backgroundColor: 'var(--input-bg)',
+                              border: '1px solid var(--liverpool)',
+                              borderRadius: '6px',
+                              padding: '2px 6px',
+                              fontSize: '11px',
+                              color: '#fff',
+                              outline: 'none',
+                            }}
+                          />
+                          <button
+                            onClick={(e) => handleSaveRename(e, sub.id)}
+                            style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', padding: '2px' }}
+                            title="Save name"
+                          >
+                            <Check className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={handleCancelRename}
+                            style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '2px' }}
+                            title="Cancel"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <div
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', flex: 1 }}
+                            onClick={() => {
+                              onSelectCategory(sub.id);
+                              setShowCategoryPopover(false);
+                            }}
+                          >
+                            <CornerDownRight className="w-3 h-3 text-gray-500" />
+                            <span>{sub.name}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <button
+                              onClick={(e) => handleStartRename(e, sub.id, sub.name)}
+                              style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '3px' }}
+                              title={`Rename ${sub.name}`}
+                            >
+                              <Edit2 className="w-2.5 h-2.5 hover:text-white" />
+                            </button>
+                            {!isMobileViewer && (
+                              <button
+                                onClick={() => onDeleteCategory(sub.id)}
+                                style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: '2px' }}
+                                title={`Delete ${sub.name}`}
+                              >
+                                <X className="w-3 h-3 hover:text-red-400" />
+                              </button>
+                            )}
+                          </div>
+                        </>
                       )}
                     </div>
                   ))}
