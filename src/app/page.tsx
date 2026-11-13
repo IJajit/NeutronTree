@@ -18,6 +18,7 @@ import {
   pullNodesFromGoogleDrive,
   syncBoardStateToDrive,
   pullBoardStateFromDrive,
+  setAuthErrorHandler,
 } from '@/lib/drive/googleDrive';
 
 export default function Home() {
@@ -147,6 +148,12 @@ export default function Home() {
       // Check live Drive connection token
       const isConnected = connectedFromRedirect || Boolean(getStoredAccessToken());
       setIsDriveConnected(isConnected);
+
+      // Register handler for expired 401 tokens
+      setAuthErrorHandler(() => {
+        setIsDriveConnected(false);
+        setIsDriveModalOpen(true);
+      });
 
       // If Google Drive is connected, non-destructively pull/sync cards from cloud
       if (isConnected) {
@@ -1179,6 +1186,8 @@ export default function Home() {
         onClose={() => setIsDriveModalOpen(false)}
         isDriveConnected={isDriveConnected}
         onConnectDrive={(connected) => setIsDriveConnected(connected)}
+        onManualSync={handleManualSyncWithDrive}
+        isSyncing={isSyncingDrive}
       />
 
       

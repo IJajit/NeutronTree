@@ -573,9 +573,9 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
 
         {/* Google Drive Button & Direct Cloud Sync Button */}
         <button
-          onClick={onSyncWithDrive || onOpenDriveModal}
+          onClick={onOpenDriveModal}
           className="glass-circle-btn touch-manipulation"
-          title={isDriveConnected ? 'Click to Sync with Google Drive' : 'Connect Google Drive'}
+          title={isDriveConnected ? 'Google Drive (Connected) - Click to manage & sync' : 'Connect Google Drive'}
         >
           <Cloud
             className={`w-4 h-4 ${isDriveConnected ? 'text-emerald-500' : ''} ${isSyncing ? 'animate-pulse' : ''}`}

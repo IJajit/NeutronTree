@@ -10,6 +10,28 @@ export const DEFAULT_CLIENT_ID = '523293829704-gos7rnsh1997a9ff87jkh9p90qvlmoac.
 const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 let tokenClient: any = null;
 let activeAccessToken: string | null = null;
+type AuthErrorHandler = () => void;
+let onAuthErrorCallback: AuthErrorHandler | null = null;
+
+export function setAuthErrorHandler(callback: AuthErrorHandler | null) {
+  onAuthErrorCallback = callback;
+}
+
+export function handleAuthError() {
+  setStoredAccessToken(null);
+  if (onAuthErrorCallback) {
+    onAuthErrorCallback();
+  }
+}
+
+export async function authenticatedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const res = await fetch(input, init);
+  if (res.status === 401) {
+    console.warn('Google Drive OAuth access token expired (401 Unauthorized)');
+    handleAuthError();
+  }
+  return res;
+}
 
 export function getStoredAccessToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -162,7 +184,7 @@ export async function syncBoardStateToDrive(bundle: CloudBoardSyncBundle): Promi
     const fileName = 'neuron_tree_board_meta.json';
     const content = JSON.stringify(bundle, null, 2);
 
-    const searchRes = await fetch(
+    const searchRes = await authenticatedFetch(
       `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
         `name = '${fileName}' and '${rootFolderId}' in parents and trashed = false`
       )}&fields=files(id)`,
@@ -172,7 +194,7 @@ export async function syncBoardStateToDrive(bundle: CloudBoardSyncBundle): Promi
     const existingId = searchData.files?.[0]?.id;
 
     if (existingId) {
-      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=media`, {
+      await authenticatedFetch(`https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=media`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: content,
@@ -186,7 +208,7 @@ export async function syncBoardStateToDrive(bundle: CloudBoardSyncBundle): Promi
         })
       );
       form.append('file', new Blob([content], { type: 'application/json' }), fileName);
-      await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      await authenticatedFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: form,
@@ -206,16 +228,17 @@ export async function pullBoardStateFromDrive(): Promise<CloudBoardSyncBundle | 
 
   try {
     const rootFolderId = await getOrCreateDriveFolder('NeuronTree');
-    const searchRes = await fetch(
+    const searchRes = await authenticatedFetch(
       `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
         `name = 'neuron_tree_board_meta.json' and '${rootFolderId}' in parents and trashed = false`
       )}&fields=files(id)`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
+    if (!searchRes.ok) return null;
     const searchData = await searchRes.json();
     const fileId = searchData.files?.[0]?.id;
     if (fileId) {
-      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+      const res = await authenticatedFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -239,26 +262,31 @@ export async function pullNodesFromGoogleDrive(): Promise<BlockNode[]> {
   try {
     // 1. Search for all .json block state files in Google Drive created by this app (.json files ending with .json)
     const query = `mimeType = 'application/json' and name contains '.json' and name != 'neuron_tree_board_meta.json' and trashed = false`;
-    const searchRes = await fetch(
+    const searchRes = await authenticatedFetch(
       `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&pageSize=500`,
       {
         headers: { Authorization: `Bearer ${token}` },
       }
     );
+    if (!searchRes.ok) return [];
 
     const searchData = await searchRes.json();
     const files = searchData.files || [];
-    const pulledNodes: BlockNode[] = [];
+    const pulledNodesMap = new Map<string, BlockNode>();
 
     for (const file of files) {
       try {
-        const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
+        const fileRes = await authenticatedFetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (fileRes.ok) {
           const nodeData = await fileRes.json();
           if (nodeData && nodeData.id && nodeData.type) {
-            pulledNodes.push(nodeData);
+            // Deduplicate by node ID, preferring higher updatedAt timestamp
+            const existing = pulledNodesMap.get(nodeData.id);
+            if (!existing || (nodeData.updatedAt || 0) >= (existing.updatedAt || 0)) {
+              pulledNodesMap.set(nodeData.id, nodeData);
+            }
           }
         }
       } catch (err) {
@@ -266,7 +294,7 @@ export async function pullNodesFromGoogleDrive(): Promise<BlockNode[]> {
       }
     }
 
-    return pulledNodes;
+    return Array.from(pulledNodesMap.values());
   } catch (err) {
     console.warn('Failed to pull nodes from Google Drive:', err);
     return [];
@@ -282,7 +310,7 @@ async function getOrCreateDriveFolder(folderName: string, parentId?: string): Pr
     query += ` and '${parentId}' in parents`;
   }
 
-  const searchRes = await fetch(
+  const searchRes = await authenticatedFetch(
     `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`,
     {
       headers: { Authorization: `Bearer ${token}` },
@@ -295,7 +323,7 @@ async function getOrCreateDriveFolder(folderName: string, parentId?: string): Pr
   }
 
   // Create folder if not found
-  const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+  const createRes = await authenticatedFetch('https://www.googleapis.com/drive/v3/files', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -314,6 +342,7 @@ async function getOrCreateDriveFolder(folderName: string, parentId?: string): Pr
 
 /**
  * Helper to upload raw binary data (image, pdf) or text/shortcut to Google Drive
+ * Cleans up any duplicate/old files with the same name across NeuronTree folders before uploading
  */
 async function uploadMediaFileToDrive(
   fileName: string,
@@ -323,6 +352,41 @@ async function uploadMediaFileToDrive(
   token: string
 ): Promise<string | null> {
   try {
+    // Check if a file with this name already exists in target folder or across other categories
+    const searchRes = await authenticatedFetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+        `name = '${fileName}' and trashed = false`
+      )}&fields=files(id, parents)`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const searchData = await searchRes.json();
+    const existingFiles: Array<{ id: string; parents?: string[] }> = searchData.files || [];
+
+    // If an existing file is already in the target folder, update it in place
+    const matchingInTarget = existingFiles.find((f) => f.parents?.includes(parentFolderId));
+    if (matchingInTarget) {
+      if (typeof blobOrText === 'string') {
+        await authenticatedFetch(
+          `https://www.googleapis.com/upload/drive/v3/files/${matchingInTarget.id}?uploadType=media`,
+          {
+            method: 'PATCH',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': mimeType },
+            body: blobOrText,
+          }
+        );
+      }
+      return matchingInTarget.id;
+    }
+
+    // If it exists in a different folder (e.g. card changed category), trash the old duplicate
+    for (const oldFile of existingFiles) {
+      await authenticatedFetch(`https://www.googleapis.com/drive/v3/files/${oldFile.id}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trashed: true }),
+      });
+    }
+
     const metadata = {
       name: fileName,
       mimeType: mimeType,
@@ -337,7 +401,7 @@ async function uploadMediaFileToDrive(
       form.append('file', blobOrText, fileName);
     }
 
-    const uploadRes = await fetch(
+    const uploadRes = await authenticatedFetch(
       'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
       {
         method: 'POST',
@@ -380,6 +444,7 @@ function dataUrlToBlob(dataUrl: string, fallbackMime: string): Blob {
  * Uploads or updates a node block inside /NeuronTree/[Category]/
  * Creates direct accessible human files (Images, PDFs, .url Shortcuts, .md Notes)
  * along with the companion index JSON for canvas reconstruction.
+ * Automatically removes any duplicate files in other categories to prevent duplicates.
  */
 export async function syncNodeToGoogleDrive(node: BlockNode): Promise<string | null> {
   const token = getStoredAccessToken();
@@ -434,27 +499,39 @@ export async function syncNodeToGoogleDrive(node: BlockNode): Promise<string | n
       await uploadMediaFileToDrive(noteFileName, 'text/markdown', noteContent, categoryFolderId, token);
     }
 
-    // 2. Upload canvas coordinate state JSON
+    // 2. Upload canvas coordinate state JSON & clean up any duplicates across any other folder
     const fileName = `${node.id}.json`;
     const fileContent = JSON.stringify(node, null, 2);
 
-    // Check if JSON exists in category folder
-    const searchRes = await fetch(
+    // Search for all instances of this JSON across Drive
+    const searchRes = await authenticatedFetch(
       `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
-        `name = '${fileName}' and '${categoryFolderId}' in parents and trashed = false`
-      )}&fields=files(id)`,
+        `name = '${fileName}' and trashed = false`
+      )}&fields=files(id, parents)`,
       {
         headers: { Authorization: `Bearer ${token}` },
       }
     );
 
     const searchData = await searchRes.json();
-    const existingFileId = searchData.files?.[0]?.id;
+    const existingFiles: Array<{ id: string; parents?: string[] }> = searchData.files || [];
 
-    if (existingFileId) {
+    const existingInTarget = existingFiles.find((f) => f.parents?.includes(categoryFolderId));
+    // Trash any duplicate JSON files in other folders (e.g. from prior category moves)
+    for (const oldFile of existingFiles) {
+      if (oldFile.id !== existingInTarget?.id) {
+        await authenticatedFetch(`https://www.googleapis.com/drive/v3/files/${oldFile.id}`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trashed: true }),
+        });
+      }
+    }
+
+    if (existingInTarget) {
       // Update existing file content
-      await fetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=media`,
+      await authenticatedFetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${existingInTarget.id}?uploadType=media`,
         {
           method: 'PATCH',
           headers: {
@@ -464,7 +541,7 @@ export async function syncNodeToGoogleDrive(node: BlockNode): Promise<string | n
           body: fileContent,
         }
       );
-      return existingFileId;
+      return existingInTarget.id;
     } else {
       const form = new FormData();
       form.append(
@@ -476,7 +553,7 @@ export async function syncNodeToGoogleDrive(node: BlockNode): Promise<string | n
       );
       form.append('file', new Blob([fileContent], { type: 'application/json' }), fileName);
 
-      const uploadRes = await fetch(
+      const uploadRes = await authenticatedFetch(
         'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
         {
           method: 'POST',
@@ -510,7 +587,7 @@ export async function trashNodeOnGoogleDrive(nodeId: string, nodeTitle?: string)
       queryParts.push(`name contains '${cleanTitle}'`);
     }
 
-    const searchRes = await fetch(
+    const searchRes = await authenticatedFetch(
       `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
         `(${queryParts.join(' or ')}) and trashed = false`
       )}&fields=files(id, name)`,
@@ -523,7 +600,7 @@ export async function trashNodeOnGoogleDrive(nodeId: string, nodeTitle?: string)
     const files = searchData.files || [];
 
     for (const file of files) {
-      await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}`, {
+      await authenticatedFetch(`https://www.googleapis.com/drive/v3/files/${file.id}`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -551,7 +628,7 @@ export async function moveCategoryOnGoogleDrive(oldCategoryName: string, newCate
     const rootFolderId = await getOrCreateDriveFolder('NeuronTree');
     const oldFolderId = await getOrCreateDriveFolder(oldCategoryName, rootFolderId);
     // Rename old folder
-    await fetch(`https://www.googleapis.com/drive/v3/files/${oldFolderId}`, {
+    await authenticatedFetch(`https://www.googleapis.com/drive/v3/files/${oldFolderId}`, {
       method: 'PATCH',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -573,7 +650,7 @@ export async function trashCategoryOnGoogleDrive(categoryName: string): Promise<
 
   try {
     const rootFolderId = await getOrCreateDriveFolder('NeuronTree');
-    const searchRes = await fetch(
+    const searchRes = await authenticatedFetch(
       `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
         `name = '${categoryName}' and '${rootFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`
       )}&fields=files(id)`,
@@ -582,7 +659,7 @@ export async function trashCategoryOnGoogleDrive(categoryName: string): Promise<
     const searchData = await searchRes.json();
     const folderId = searchData.files?.[0]?.id;
     if (folderId) {
-      await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}`, {
+      await authenticatedFetch(`https://www.googleapis.com/drive/v3/files/${folderId}`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,

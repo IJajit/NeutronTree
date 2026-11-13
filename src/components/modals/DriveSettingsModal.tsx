@@ -13,6 +13,8 @@ interface DriveSettingsModalProps {
   onClose: () => void;
   isDriveConnected: boolean;
   onConnectDrive: (connected: boolean) => void;
+  onManualSync?: () => Promise<void>;
+  isSyncing?: boolean;
 }
 
 export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
@@ -20,6 +22,8 @@ export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
   onClose,
   isDriveConnected,
   onConnectDrive,
+  onManualSync,
+  isSyncing,
 }) => {
   const [clientId, setClientId] = useState(DEFAULT_CLIENT_ID);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
@@ -258,17 +262,45 @@ export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
             >
               Close
             </button>
+            {isDriveConnected && onManualSync && (
+              <button
+                onClick={async () => {
+                  try {
+                    await onManualSync();
+                  } catch (e) {
+                    console.error(e);
+                  }
+                }}
+                disabled={isSyncing || isAuthenticating}
+                style={{
+                  padding: '9px 18px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  color: '#ffffff',
+                  borderRadius: '9999px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  cursor: isSyncing ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                {isSyncing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isSyncing ? 'Syncing...' : 'Sync Board Now'}
+              </button>
+            )}
             <button
               onClick={isDriveConnected ? handleDisconnect : handleConnect}
               disabled={isAuthenticating}
               style={{
                 padding: '9px 22px',
-                backgroundColor: isDriveConnected ? 'rgba(255, 255, 255, 0.1)' : 'var(--liverpool)',
+                backgroundColor: isDriveConnected ? 'rgba(200, 16, 46, 0.2)' : 'var(--liverpool)',
                 color: '#ffffff',
                 borderRadius: '9999px',
                 fontSize: '13px',
                 fontWeight: 500,
-                border: 'none',
+                border: isDriveConnected ? '1px solid rgba(200, 16, 46, 0.4)' : 'none',
                 cursor: isAuthenticating ? 'not-allowed' : 'pointer',
                 boxShadow: isDriveConnected ? 'none' : '0 0 15px var(--liverpool-glow)',
                 display: 'flex',
