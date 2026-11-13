@@ -40,12 +40,13 @@ export const Minimap: React.FC<MinimapProps> = ({ nodes, viewport, onNavigate })
   return (
     <div
       onClick={handleMinimapClick}
-      className="fixed top-4 right-4 md:top-6 md:right-6 z-40 backdrop-blur-xl border rounded-xl md:rounded-2xl p-1.5 md:p-2.5 shadow-xl cursor-crosshair overflow-hidden group hover:border-[var(--liverpool)] transition-all"
+      className="fixed top-4 right-4 md:top-6 md:right-6 z-40 backdrop-blur-xl border rounded-xl md:rounded-2xl p-1.5 md:p-2.5 cursor-crosshair overflow-hidden group hover:border-[var(--liverpool)] transition-all"
       style={{
         width: mapWidth,
         height: mapHeight,
         backgroundColor: 'var(--glass-bg)',
         borderColor: 'var(--border)',
+        boxShadow: 'var(--minimap-shadow)',
       }}
     >
       <div className="relative w-full h-full">

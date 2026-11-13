@@ -1136,7 +1136,7 @@ export default function Home() {
             backdropFilter: 'blur(28px) saturate(190%) brightness(105%)',
             backgroundColor: 'var(--glass-bg)',
             border: '1px solid var(--glass-border)',
-            boxShadow: '0 12px 30px -6px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12)',
+            boxShadow: 'var(--pill-shadow)',
           }}
           title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
@@ -1158,7 +1158,7 @@ export default function Home() {
             borderRadius: '9999px',
             padding: '3px 5px',
             gap: '3px',
-            boxShadow: '0 12px 30px -6px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12)',
+            boxShadow: 'var(--pill-shadow)',
           }}
         >
           <span style={{ fontSize: '11px', padding: '0 5px', color: 'var(--text-muted)', fontWeight: 600, minWidth: '34px', textAlign: 'center' }}>
