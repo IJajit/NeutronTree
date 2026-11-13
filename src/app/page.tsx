@@ -19,6 +19,7 @@ import {
   syncBoardStateToDrive,
   pullBoardStateFromDrive,
   setAuthErrorHandler,
+  cleanWipeAndResyncDrive,
 } from '@/lib/drive/googleDrive';
 
 export default function Home() {
@@ -861,34 +862,44 @@ export default function Home() {
     }
     setIsSyncingDrive(true);
     try {
-      const [driveNodes, cloudMeta] = await Promise.all([
-        pullNodesFromGoogleDrive(),
-        pullBoardStateFromDrive(),
-      ]);
+      if (nodes.length > 0) {
+        // Clean wipe of Google Drive folder and cleanly resync active board state and nodes
+        await cleanWipeAndResyncDrive(nodes, {
+          categories,
+          viewport,
+          activeCategory,
+          updatedAt: Date.now(),
+        });
+      } else {
+        const [driveNodes, cloudMeta] = await Promise.all([
+          pullNodesFromGoogleDrive(),
+          pullBoardStateFromDrive(),
+        ]);
 
-      if (driveNodes.length > 0) {
-        await db.nodes.clear();
-        for (const dNode of driveNodes) {
-          await db.nodes.put(dNode);
-        }
-        const updatedNodes = await db.nodes.toArray();
-        setNodes(updatedNodes);
-        centerCanvasOnNodes(updatedNodes);
-      }
-
-      if (cloudMeta) {
-        if (cloudMeta.categories && cloudMeta.categories.length > 0) {
-          await db.categories.clear();
-          for (const c of cloudMeta.categories) {
-            await db.categories.put(c);
+        if (driveNodes.length > 0) {
+          await db.nodes.clear();
+          for (const dNode of driveNodes) {
+            await db.nodes.put(dNode);
           }
-          setCategories(cloudMeta.categories);
+          const updatedNodes = await db.nodes.toArray();
+          setNodes(updatedNodes);
+          centerCanvasOnNodes(updatedNodes);
         }
-        if (cloudMeta.viewport) {
-          setViewport(cloudMeta.viewport);
-        }
-        if (cloudMeta.activeCategory) {
-          setActiveCategory(cloudMeta.activeCategory);
+
+        if (cloudMeta) {
+          if (cloudMeta.categories && cloudMeta.categories.length > 0) {
+            await db.categories.clear();
+            for (const c of cloudMeta.categories) {
+              await db.categories.put(c);
+            }
+            setCategories(cloudMeta.categories);
+          }
+          if (cloudMeta.viewport) {
+            setViewport(cloudMeta.viewport);
+          }
+          if (cloudMeta.activeCategory) {
+            setActiveCategory(cloudMeta.activeCategory);
+          }
         }
       }
     } catch (err) {

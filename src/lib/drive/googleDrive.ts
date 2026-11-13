@@ -672,3 +672,52 @@ export async function trashCategoryOnGoogleDrive(categoryName: string): Promise<
     console.warn('Google Drive trash category error:', err);
   }
 }
+
+/**
+ * Clean wipe of all files/folders inside /NeuronTree/ on Google Drive to eliminate
+ * any orphaned folders (e.g. legacy 'general') or duplicated assets from prior sessions,
+ * then cleanly push the current board state and all active blocks.
+ */
+export async function cleanWipeAndResyncDrive(nodes: BlockNode[], bundle: CloudBoardSyncBundle): Promise<void> {
+  const token = getStoredAccessToken();
+  if (!token) return;
+
+  try {
+    const rootFolderId = await getOrCreateDriveFolder('NeuronTree');
+
+    // 1. Fetch all items (folders, json, media assets) directly inside NeuronTree
+    const searchRes = await authenticatedFetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+        `'${rootFolderId}' in parents and trashed = false`
+      )}&fields=files(id, name)&pageSize=1000`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    if (searchRes.ok) {
+      const searchData = await searchRes.json();
+      const files = searchData.files || [];
+
+      // Trash all old/orphan contents in root folder
+      for (const file of files) {
+        await authenticatedFetch(`https://www.googleapis.com/drive/v3/files/${file.id}`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ trashed: true }),
+        });
+      }
+    }
+
+    // 2. Resync clean meta board state
+    await syncBoardStateToDrive(bundle);
+
+    // 3. Resync all current nodes cleanly
+    for (const node of nodes) {
+      await syncNodeToGoogleDrive(node);
+    }
+  } catch (err) {
+    console.warn('Error during clean wipe & resync of Google Drive:', err);
+  }
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Cloud, CheckCircle2, ShieldCheck, FolderSync, Info, X, Loader2, AlertCircle } from 'lucide-react';
+import { Cloud, CheckCircle2, X, Loader2, AlertCircle } from 'lucide-react';
 import {
   requestGoogleDriveAuth,
   redirectToGoogleOAuth,
@@ -131,64 +131,51 @@ export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
         </div>
 
         <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
-          {/* Status Box */}
-          <div
-            style={{
-              padding: '16px 18px',
-              borderRadius: '16px',
-              backgroundColor: 'rgba(0, 0, 0, 0.45)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <FolderSync className="w-4 h-4 text-[var(--liverpool)]" />
-              <div>
-                <p style={{ fontSize: '13px', fontWeight: 500, color: '#ededed' }}>Drive Folder Hierarchy</p>
-                <p style={{ fontSize: '11px', color: '#777777', fontFamily: 'monospace', marginTop: '3px' }}>
-                  /Google Drive/NeuronTree/[Category]/
-                </p>
-              </div>
-            </div>
-            {isDriveConnected ? (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#34d399', fontSize: '12px', fontWeight: 500 }}>
-                <CheckCircle2 className="w-4 h-4" /> Synced
-              </span>
-            ) : (
-              <span style={{ color: '#fbbf24', fontSize: '12px', fontWeight: 500 }}>Local IndexedDB</span>
-            )}
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '12px',
-              padding: '16px 18px',
-              borderRadius: '16px',
-              backgroundColor: 'var(--liverpool-subtle)',
-              border: '1px solid rgba(200, 16, 46, 0.25)',
-              color: '#cccccc',
-            }}
-          >
-            <ShieldCheck className="w-4 h-4 text-[var(--liverpool)] shrink-0" style={{ marginTop: '2px' }} />
-            <div style={{ fontSize: '12px', lineHeight: '1.6' }}>
-              <strong style={{ color: '#ffffff', display: 'block', marginBottom: '2px' }}>
-                Safe Recycle Bin & Privacy
-              </strong>
-              Deleted cards are moved to Google Drive&apos;s native Trash (Recycle Bin). Your inspirations are always recoverable.
-            </div>
-          </div>
-
+          {/* Credentials Input with inline Synced / Status pill */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>
-              Google OAuth Client ID (from Google Cloud Credentials)
-            </label>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>
+                Credentials
+              </label>
+              {isDriveConnected ? (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    color: '#34d399',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                    border: '1px solid rgba(52, 211, 153, 0.25)',
+                    padding: '2px 8px',
+                    borderRadius: '9999px',
+                  }}
+                >
+                  <CheckCircle2 className="w-3 h-3" /> Synced
+                </span>
+              ) : (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    color: '#fbbf24',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                    border: '1px solid rgba(251, 191, 36, 0.25)',
+                    padding: '2px 8px',
+                    borderRadius: '9999px',
+                  }}
+                >
+                  Disconnected
+                </span>
+              )}
+            </div>
             <input
               type="text"
-              placeholder="123456789-abcdef.apps.googleusercontent.com"
+              placeholder="Google OAuth Client ID"
               value={clientId}
               onChange={(e) => {
                 setClientId(e.target.value);
@@ -225,17 +212,6 @@ export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
               <span>{errorMessage}</span>
             </div>
           )}
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', color: 'var(--text-muted)', fontSize: '11px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Info className="w-3.5 h-3.5 text-[var(--liverpool)] shrink-0" />
-              <span><strong>Authorized JavaScript Origin:</strong> <code style={{ color: 'var(--text-main)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px' }}>https://neutrontree.vercel.app</code></span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Info className="w-3.5 h-3.5 text-[var(--liverpool)] shrink-0" />
-              <span><strong>Authorized Redirect URI:</strong> <code style={{ color: 'var(--text-main)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px' }}>https://neutrontree.vercel.app</code></span>
-            </div>
-          </div>
 
           <div
             style={{
@@ -287,7 +263,7 @@ export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
                 }}
               >
                 {isSyncing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                {isSyncing ? 'Syncing...' : 'Sync Board Now'}
+                {isSyncing ? 'Syncing...' : 'Sync'}
               </button>
             )}
             <button
@@ -309,7 +285,7 @@ export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
               }}
             >
               {isAuthenticating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {isDriveConnected ? 'Disconnect' : (isAuthenticating ? 'Authorizing with Google...' : 'Connect Google Drive')}
+              {isDriveConnected ? 'Disconnect' : (isAuthenticating ? 'Authorizing...' : 'Connect Google Drive')}
             </button>
           </div>
         </div>
