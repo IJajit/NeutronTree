@@ -372,7 +372,7 @@ export default function Home() {
             setNodes(nextState);
             if (isDriveConnected) {
               for (const n of nextState) {
-                syncNodeToGoogleDrive(n);
+                syncNodeToGoogleDrive(n, categories);
               }
             }
             isUndoRedoActionRef.current = false;
@@ -390,7 +390,7 @@ export default function Home() {
             setNodes(prevState);
             if (isDriveConnected) {
               for (const n of prevState) {
-                syncNodeToGoogleDrive(n);
+                syncNodeToGoogleDrive(n, categories);
               }
             }
             isUndoRedoActionRef.current = false;
@@ -410,7 +410,7 @@ export default function Home() {
           setNodes(nextState);
           if (isDriveConnected) {
             for (const n of nextState) {
-              syncNodeToGoogleDrive(n);
+              syncNodeToGoogleDrive(n, categories);
             }
           }
           isUndoRedoActionRef.current = false;
@@ -516,7 +516,7 @@ export default function Home() {
         if (movedNode) {
           await db.nodes.update(movedNode.id, { x: movedNode.x, y: movedNode.y });
           if (isDriveConnected) {
-            syncNodeToGoogleDrive(movedNode);
+            syncNodeToGoogleDrive(movedNode, categories);
           }
         }
       }
@@ -659,7 +659,7 @@ export default function Home() {
         if (movedNode) {
           await db.nodes.update(movedNode.id, { x: movedNode.x, y: movedNode.y });
           if (isDriveConnected) {
-            syncNodeToGoogleDrive(movedNode);
+            syncNodeToGoogleDrive(movedNode, categories);
           }
         }
       }
@@ -801,8 +801,7 @@ export default function Home() {
     for (const node of affectedNodes) {
       await db.nodes.update(node.id, { category: fallbackCat, updatedAt: Date.now() });
       if (isDriveConnected) {
-        const catName = remainingCats.find((c) => c.id === fallbackCat)?.name;
-        syncNodeToGoogleDrive({ ...node, category: fallbackCat, updatedAt: Date.now() }, catName);
+        syncNodeToGoogleDrive({ ...node, category: fallbackCat, updatedAt: Date.now() }, remainingCats);
       }
     }
 
@@ -848,7 +847,7 @@ export default function Home() {
       await db.nodes.put(recentlyDeleted);
       setNodes((prev) => [...prev, recentlyDeleted]);
       if (isDriveConnected) {
-        syncNodeToGoogleDrive(recentlyDeleted);
+        syncNodeToGoogleDrive(recentlyDeleted, categories);
       }
       setRecentlyDeleted(null);
       setShowUndoToast(false);
@@ -888,8 +887,7 @@ export default function Home() {
 
     // Sync to Google Drive if connected
     if (isDriveConnected) {
-      const catObj = categories.find((c) => c.id === newNode.category);
-      syncNodeToGoogleDrive(newNode, catObj?.name);
+      syncNodeToGoogleDrive(newNode, categories);
     }
   };
 
@@ -900,8 +898,7 @@ export default function Home() {
         if (n.id === id) {
           const updated = { ...n, ...partial } as BlockNode;
           if (isDriveConnected) {
-            const catObj = categories.find((c) => c.id === updated.category);
-            syncNodeToGoogleDrive(updated, catObj?.name);
+            syncNodeToGoogleDrive(updated, categories);
           }
           return updated;
         }

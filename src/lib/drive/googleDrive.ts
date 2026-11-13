@@ -441,23 +441,73 @@ function dataUrlToBlob(dataUrl: string, fallbackMime: string): Blob {
 }
 
 /**
- * Uploads or updates a node block inside /NeuronTree/[Category]/
+ * Resolves the Google Drive folder ID for a category, supporting nested hierarchy
+ * (e.g. NeuronTree/Resources/Animation).
+ * If the category is a subcategory, it ensures the parent folder exists directly inside NeuronTree,
+ * and creates the subcategory folder nested inside that parent folder.
+ * Root of NeuronTree will ONLY contain top-level parent categories.
+ */
+export async function getCategoryDriveFolder(
+  categoryIdOrName: string,
+  categories?: Category[]
+): Promise<string> {
+  const rootFolderId = await getOrCreateDriveFolder('NeuronTree');
+
+  // If no categories list provided, check if it's already a clean top-level name
+  if (!categories || categories.length === 0) {
+    const cleanName = categoryIdOrName.replace(/[\\/:*?"<>|]/g, '_').trim() || 'General';
+    return await getOrCreateDriveFolder(cleanName, rootFolderId);
+  }
+
+  // 1. Try to match by ID first, then by name
+  const catObj = categories.find((c) => c.id === categoryIdOrName) ||
+                 categories.find((c) => c.name.toLowerCase() === categoryIdOrName.toLowerCase());
+
+  if (!catObj) {
+    const cleanName = categoryIdOrName.replace(/[\\/:*?"<>|]/g, '_').trim() || 'General';
+    return await getOrCreateDriveFolder(cleanName, rootFolderId);
+  }
+
+  // If this category is a subcategory (has parentId)
+  if (catObj.parentId) {
+    const parentCat = categories.find((c) => c.id === catObj.parentId);
+    const parentName = (parentCat?.name || catObj.parentId).replace(/[\\/:*?"<>|]/g, '_').trim();
+    // 1. Ensure parent folder exists inside NeuronTree
+    const parentFolderId = await getOrCreateDriveFolder(parentName, rootFolderId);
+    // 2. Ensure subcategory folder exists inside the parent folder (nested!)
+    const subName = catObj.name.replace(/[\\/:*?"<>|]/g, '_').trim();
+    return await getOrCreateDriveFolder(subName, parentFolderId);
+  }
+
+  // Top-level category folder directly inside NeuronTree
+  const topName = catObj.name.replace(/[\\/:*?"<>|]/g, '_').trim();
+  return await getOrCreateDriveFolder(topName, rootFolderId);
+}
+
+/**
+ * Uploads or updates a node block inside /NeuronTree/[ParentCategory]/[Subcategory]/
  * Creates direct accessible human files (Images, PDFs, .url Shortcuts, .md Notes)
  * along with the companion index JSON for canvas reconstruction.
  * Automatically removes any duplicate files in other categories to prevent duplicates.
  */
 export async function syncNodeToGoogleDrive(
   node: BlockNode,
-  categoryName?: string
+  categories?: Category[] | string
 ): Promise<string | null> {
   const token = getStoredAccessToken();
   if (!token) return null;
 
   try {
-    const rootFolderId = await getOrCreateDriveFolder('NeuronTree');
-    // Use human category name (e.g. "Resources", "Inspiration") or fallback safely
-    const targetCategoryFolderName = categoryName || node.category || 'General';
-    const categoryFolderId = await getOrCreateDriveFolder(targetCategoryFolderName, rootFolderId);
+    let categoryFolderId: string;
+    if (Array.isArray(categories)) {
+      categoryFolderId = await getCategoryDriveFolder(node.category, categories);
+    } else if (typeof categories === 'string') {
+      const rootFolderId = await getOrCreateDriveFolder('NeuronTree');
+      categoryFolderId = await getOrCreateDriveFolder(categories, rootFolderId);
+    } else {
+      const rootFolderId = await getOrCreateDriveFolder('NeuronTree');
+      categoryFolderId = await getOrCreateDriveFolder(node.category || 'General', rootFolderId);
+    }
 
     // 1. Upload the real, accessible user asset (Images, PDFs, Links, Markdown Notes)
     const cleanTitle = (node.data.title || node.id).replace(/[\\/:*?"<>|]/g, '_').trim();
@@ -718,16 +768,9 @@ export async function cleanWipeAndResyncDrive(nodes: BlockNode[], bundle: CloudB
     // 2. Resync clean meta board state
     await syncBoardStateToDrive(bundle);
 
-    // Build category ID -> category human name mapping
-    const catMap = new Map<string, string>();
-    bundle.categories.forEach((cat) => {
-      catMap.set(cat.id, cat.name);
-    });
-
-    // 3. Resync all current nodes cleanly under their human category folder names
+    // 3. Resync all current nodes cleanly under their human category folder names with nested subcategories
     for (const node of nodes) {
-      const resolvedCatName = catMap.get(node.category) || node.category;
-      await syncNodeToGoogleDrive(node, resolvedCatName);
+      await syncNodeToGoogleDrive(node, bundle.categories);
     }
   } catch (err) {
     console.warn('Error during clean wipe & resync of Google Drive:', err);
