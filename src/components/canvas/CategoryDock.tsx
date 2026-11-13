@@ -70,6 +70,26 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
   const [newCatName, setNewCatName] = useState('');
   const [selectedParentId, setSelectedParentId] = useState<string>('');
   const [hoveredCatId, setHoveredCatId] = useState<string | null>(null);
+  const hoverTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const handleCatMouseEnter = (catId: string, hasSubs: boolean) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    if (hasSubs) {
+      setHoveredCatId(catId);
+    }
+  };
+
+  const handleCatMouseLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredCatId(null);
+    }, 180);
+  };
 
   // Close menus on Escape key
   React.useEffect(() => {
@@ -355,10 +375,8 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
               <div
                 key={cat.id}
                 className="relative"
-                onMouseEnter={() => {
-                  if (subs.length > 0) setHoveredCatId(cat.id);
-                }}
-                onMouseLeave={() => setHoveredCatId(null)}
+                onMouseEnter={() => handleCatMouseEnter(cat.id, subs.length > 0)}
+                onMouseLeave={handleCatMouseLeave}
               >
                 <button
                   onClick={() => {
@@ -394,17 +412,19 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
                 {/* Subcategory Flyout Menu with consistent background */}
                 {subs.length > 0 && isFlyoutOpen && (
                   <div
+                    onMouseEnter={() => handleCatMouseEnter(cat.id, true)}
+                    onMouseLeave={handleCatMouseLeave}
                     style={{
                       position: 'absolute',
-                      bottom: 'calc(100% + 10px)',
+                      bottom: 'calc(100% + 14px)',
                       left: '50%',
                       transform: 'translateX(-50%)',
-                      backgroundColor: 'var(--glass-bg)',
+                      backgroundColor: 'var(--card-bg)',
                       backdropFilter: 'blur(28px) saturate(190%)',
                       border: '1px solid var(--border)',
                       borderRadius: '16px',
                       padding: '8px',
-                      boxShadow: '0 16px 36px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+                      boxShadow: 'var(--popover-shadow)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '4px',
@@ -412,6 +432,18 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
                       zIndex: 150,
                     }}
                   >
+                    {/* Invisible bridge to prevent mouse leave gap jitter */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        height: '16px',
+                        backgroundColor: 'transparent',
+                        pointerEvents: 'auto',
+                      }}
+                    />
                     <div
                       style={{
                         fontSize: '10px',
