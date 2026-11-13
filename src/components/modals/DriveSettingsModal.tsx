@@ -235,39 +235,26 @@ export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
               borderTop: '1px solid var(--border)',
             }}
           >
-            <button
-              onClick={onClose}
-              disabled={isAuthenticating}
-              style={{
-                padding: '8px 18px',
-                fontSize: '13px',
-                color: 'var(--text-muted)',
-                backgroundColor: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              Close
-            </button>
             {isDriveConnected && onManualSync && (
               <button
                 onClick={handleSyncClick}
                 disabled={isSyncing || isAuthenticating}
                 style={{
-                  padding: '9px 18px',
-                  backgroundColor: showSyncedSuccess ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.08)',
-                  color: showSyncedSuccess ? '#10b981' : '#ffffff',
+                  padding: '9px 20px',
+                  backgroundColor: showSyncedSuccess ? '#10b981' : 'rgba(255, 255, 255, 0.08)',
+                  color: '#ffffff',
                   borderRadius: '9999px',
                   fontSize: '13px',
                   fontWeight: 500,
                   border: showSyncedSuccess
-                    ? '1px solid rgba(16, 185, 129, 0.35)'
+                    ? '1px solid #10b981'
                     : '1px solid rgba(255, 255, 255, 0.15)',
+                  boxShadow: showSyncedSuccess ? '0 0 14px rgba(16, 185, 129, 0.45)' : 'none',
                   cursor: isSyncing ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  transition: 'all 0.2s ease',
+                  transition: 'all 0.25s ease',
                 }}
               >
                 {isSyncing ? (
