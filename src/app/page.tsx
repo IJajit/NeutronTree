@@ -457,6 +457,8 @@ export default function Home() {
   const touchMidpointRef = useRef<{ x: number; y: number } | null>(null);
   const touchFocalCanvasRef = useRef<{ x: number; y: number } | null>(null);
   const isPinchingRef = useRef<boolean>(false);
+  const touchMovedDistanceRef = useRef<number>(0);
+  const touchStartPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const handleTouchStart = (e: React.TouchEvent) => {
     // If touch starts within interactive controls (dock, modals, inputs, buttons, menus), do not hijack
@@ -480,7 +482,8 @@ export default function Home() {
     if (e.touches.length === 1) {
       isPinchingRef.current = false;
       const touch = e.touches[0];
-      // Allow panning everywhere across the screen
+      touchMovedDistanceRef.current = 0;
+      touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
       setIsPanning(true);
       panStartRef.current = { x: touch.clientX - viewport.x, y: touch.clientY - viewport.y };
     } else if (e.touches.length === 2) {
@@ -524,6 +527,12 @@ export default function Home() {
       );
     } else if (!isPinchingRef.current && isPanning && e.touches.length === 1) {
       const touch = e.touches[0];
+      touchMovedDistanceRef.current += Math.hypot(
+        touch.clientX - touchStartPosRef.current.x,
+        touch.clientY - touchStartPosRef.current.y
+      );
+      touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+
       const newX = touch.clientX - panStartRef.current.x;
       const newY = touch.clientY - panStartRef.current.y;
       setViewport((prev) => ({ ...prev, x: newX, y: newY }));
@@ -1073,8 +1082,9 @@ export default function Home() {
           inset: 0,
           transformOrigin: 'top left',
           pointerEvents: 'none',
-          transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
+          transform: `translate3d(${viewport.x}px, ${viewport.y}px, 0) scale(${viewport.zoom})`,
           transition: isPanning || isPinchingRef.current || draggingNodeId ? 'none' : 'transform 0.15s ease-out',
+          willChange: 'transform',
         }}
       >
         {nodes.map((node) => {
@@ -1121,6 +1131,10 @@ export default function Home() {
                 isSelected={isSelected}
                 onSelect={(e) => {
                   e.stopPropagation();
+                  // If the user was panning or dragging on touch, do not trigger card selection
+                  if (touchMovedDistanceRef.current > 6) {
+                    return;
+                  }
                   setSelectedNodeId(node.id);
                   if (e.shiftKey) {
                     setSelectedNodeIds((prev) => {
