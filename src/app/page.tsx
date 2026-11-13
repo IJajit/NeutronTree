@@ -454,7 +454,9 @@ export default function Home() {
   // Touch Handlers for Mobile & Tablet Canvas Navigation
   const touchStartDistRef = useRef<number | null>(null);
   const touchStartZoomRef = useRef<number>(1);
-  const touchCenterCanvasRef = useRef<{ x: number; y: number } | null>(null);
+  const touchMidpointRef = useRef<{ x: number; y: number } | null>(null);
+  const touchFocalCanvasRef = useRef<{ x: number; y: number } | null>(null);
+  const isPinchingRef = useRef<boolean>(false);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     // If touch starts within interactive controls (dock, modals, inputs, buttons, menus), do not hijack
@@ -476,27 +478,31 @@ export default function Home() {
     }
 
     if (e.touches.length === 1) {
+      isPinchingRef.current = false;
       const touch = e.touches[0];
-      // Allow panning everywhere across the screen (whether on canvas background OR over a block)
+      // Allow panning everywhere across the screen
       setIsPanning(true);
       panStartRef.current = { x: touch.clientX - viewport.x, y: touch.clientY - viewport.y };
     } else if (e.touches.length === 2) {
-      // Pinch to Zoom centered exactly between the two fingers
+      // Pinch to Zoom initiation
+      isPinchingRef.current = true;
       setIsPanning(false);
+
       const t1 = e.touches[0];
       const t2 = e.touches[1];
       const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-      touchStartDistRef.current = dist;
+      touchStartDistRef.current = dist > 0 ? dist : 1;
       touchStartZoomRef.current = viewport.zoom;
 
       // Screen midpoint between the two fingers
-      const midScreenX = (t1.clientX + t2.clientX) / 2;
-      const midScreenY = (t1.clientY + t2.clientY) / 2;
+      const midX = (t1.clientX + t2.clientX) / 2;
+      const midY = (t1.clientY + t2.clientY) / 2;
+      touchMidpointRef.current = { x: midX, y: midY };
 
       // Exact world coordinates under the pinch midpoint
-      touchCenterCanvasRef.current = {
-        x: (midScreenX - viewport.x) / viewport.zoom,
-        y: (midScreenY - viewport.y) / viewport.zoom,
+      touchFocalCanvasRef.current = {
+        x: (midX - viewport.x) / viewport.zoom,
+        y: (midY - viewport.y) / viewport.zoom,
       };
     }
   };
@@ -516,33 +522,36 @@ export default function Home() {
           return n;
         })
       );
-    } else if (isPanning && e.touches.length === 1) {
+    } else if (!isPinchingRef.current && isPanning && e.touches.length === 1) {
       const touch = e.touches[0];
       const newX = touch.clientX - panStartRef.current.x;
       const newY = touch.clientY - panStartRef.current.y;
       setViewport((prev) => ({ ...prev, x: newX, y: newY }));
-    } else if (e.touches.length === 2 && touchStartDistRef.current && touchCenterCanvasRef.current) {
-      // Pinch zoom handling around the focal point between the two fingers
+    } else if (e.touches.length === 2 && touchStartDistRef.current && touchFocalCanvasRef.current) {
+      // Dynamic Pinch Zoom + 2-Finger Pan smoothly combined
       const t1 = e.touches[0];
       const t2 = e.touches[1];
       const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      if (currentDist <= 0) return;
+
       const scale = currentDist / touchStartDistRef.current;
       const newZoom = Math.min(Math.max(0.2, touchStartZoomRef.current * scale), 2.5);
 
-      const midScreenX = (t1.clientX + t2.clientX) / 2;
-      const midScreenY = (t1.clientY + t2.clientY) / 2;
+      // Current screen midpoint of the two fingers
+      const currentMidX = (t1.clientX + t2.clientX) / 2;
+      const currentMidY = (t1.clientY + t2.clientY) / 2;
 
-      // Keep the world point under the fingers locked in place
-      const focalX = touchCenterCanvasRef.current.x;
-      const focalY = touchCenterCanvasRef.current.y;
-      const newX = midScreenX - focalX * newZoom;
-      const newY = midScreenY - focalY * newZoom;
+      // Keep the world point under the initial pinch focal point locked in place at current midpoint
+      const focalX = touchFocalCanvasRef.current.x;
+      const focalY = touchFocalCanvasRef.current.y;
+      const newX = currentMidX - focalX * newZoom;
+      const newY = currentMidY - focalY * newZoom;
 
       setViewport({ x: newX, y: newY, zoom: newZoom });
     }
   };
 
-  const handleTouchEnd = async () => {
+  const handleTouchEnd = async (e: React.TouchEvent) => {
     if (draggingNodeId) {
       const movedIds = Array.from(dragStartRef.current.initialPositions.keys());
       for (const id of movedIds) {
@@ -556,9 +565,23 @@ export default function Home() {
       }
       setDraggingNodeId(null);
     }
-    setIsPanning(false);
-    touchStartDistRef.current = null;
-    touchCenterCanvasRef.current = null;
+
+    if (e.touches.length === 1) {
+      // Transitioned from 2 fingers to 1 finger: seamlessly reset pan start to prevent coordinate jump
+      isPinchingRef.current = false;
+      setIsPanning(true);
+      const remainingTouch = e.touches[0];
+      panStartRef.current = {
+        x: remainingTouch.clientX - viewport.x,
+        y: remainingTouch.clientY - viewport.y,
+      };
+    } else if (e.touches.length === 0) {
+      setIsPanning(false);
+      isPinchingRef.current = false;
+      touchStartDistRef.current = null;
+      touchFocalCanvasRef.current = null;
+      touchMidpointRef.current = null;
+    }
   };
 
   const handleStartDragNodeTouch = (e: React.TouchEvent, id: string) => {
@@ -1051,7 +1074,7 @@ export default function Home() {
           transformOrigin: 'top left',
           pointerEvents: 'none',
           transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
-          transition: isPanning || draggingNodeId ? 'none' : 'transform 0.15s ease-out',
+          transition: isPanning || isPinchingRef.current || draggingNodeId ? 'none' : 'transform 0.15s ease-out',
         }}
       >
         {nodes.map((node) => {
