@@ -252,21 +252,23 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
                           {cat.name}
                         </span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <button
-                            onClick={(e) => handleStartRename(e, cat.id, cat.name)}
-                            style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '4px' }}
-                            title={`Rename ${cat.name}`}
-                          >
-                            <Edit2 className="w-3 h-3 hover:text-white" />
-                          </button>
                           {!isMobileViewer && (
-                            <button
-                              onClick={() => onDeleteCategory(cat.id)}
-                              style={{ background: 'none', border: 'none', color: '#777', cursor: 'pointer', padding: '4px' }}
-                              title={`Delete ${cat.name}`}
-                            >
-                              <X className="w-3.5 h-3.5 hover:text-red-400" />
-                            </button>
+                            <>
+                              <button
+                                onClick={(e) => handleStartRename(e, cat.id, cat.name)}
+                                style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '4px' }}
+                                title={`Rename ${cat.name}`}
+                              >
+                                <Edit2 className="w-3 h-3 hover:text-white" />
+                              </button>
+                              <button
+                                onClick={() => onDeleteCategory(cat.id)}
+                                style={{ background: 'none', border: 'none', color: '#777', cursor: 'pointer', padding: '4px' }}
+                                title={`Delete ${cat.name}`}
+                              >
+                                <X className="w-3.5 h-3.5 hover:text-red-400" />
+                              </button>
+                            </>
                           )}
                         </div>
                       </>
@@ -340,21 +342,23 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
                             <span>{sub.name}</span>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <button
-                              onClick={(e) => handleStartRename(e, sub.id, sub.name)}
-                              style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '3px' }}
-                              title={`Rename ${sub.name}`}
-                            >
-                              <Edit2 className="w-2.5 h-2.5 hover:text-white" />
-                            </button>
                             {!isMobileViewer && (
-                              <button
-                                onClick={() => onDeleteCategory(sub.id)}
-                                style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: '2px' }}
-                                title={`Delete ${sub.name}`}
-                              >
-                                <X className="w-3 h-3 hover:text-red-400" />
-                              </button>
+                              <>
+                                <button
+                                  onClick={(e) => handleStartRename(e, sub.id, sub.name)}
+                                  style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '3px' }}
+                                  title={`Rename ${sub.name}`}
+                                >
+                                  <Edit2 className="w-2.5 h-2.5 hover:text-white" />
+                                </button>
+                                <button
+                                  onClick={() => onDeleteCategory(sub.id)}
+                                  style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: '2px' }}
+                                  title={`Delete ${sub.name}`}
+                                >
+                                  <X className="w-3 h-3 hover:text-red-400" />
+                                </button>
+                              </>
                             )}
                           </div>
                         </>
