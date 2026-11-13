@@ -8,7 +8,7 @@ export class InspoDatabase extends Dexie {
 
   constructor() {
     super('InspoCanvasDB');
-    this.version(1).stores({
+    this.version(2).stores({
       nodes: 'id, type, category, createdAt, updatedAt',
       categories: 'id, order, name',
       boardState: 'id'
@@ -25,6 +25,15 @@ export const INITIAL_NODES: BlockNode[] = [];
 export async function initializeDbDefaults() {
   try {
     // Purge legacy demo categories if they exist (e.g. from previous sessions)
+
+    const oldNames = ['architecture', 'systemic design', 'ui / interfaces', 'typography', 'field notes'];
+    const currentCats = await db.categories.toArray();
+    for (const c of currentCats) {
+      if (oldNames.includes(c.name.toLowerCase().trim()) || c.id === 'architecture' || c.id === 'systemic-design' || c.id === 'ui-ux' || c.id === 'typography' || c.id === 'notes') {
+        await db.categories.delete(c.id);
+      }
+    }
+
     const legacyCategoryIds = ['architecture', 'systemic-design', 'ui-ux', 'typography', 'notes'];
     for (const legacyId of legacyCategoryIds) {
       const cat = await db.categories.get(legacyId);

@@ -72,6 +72,7 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
 
   return (
     <div className="glass-dock-container relative">
+      
       {/* Category Manager Floating Popover */}
       {showCategoryPopover && (
         <div
@@ -98,7 +99,9 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main)' }}>Manage Categories & Subcategories</span>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main)' }}>
+              {isMobileViewer ? 'Categories' : 'Manage Categories & Subcategories'}
+            </span>
             <button
               onClick={() => setShowCategoryPopover(false)}
               style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '4px' }}
@@ -108,7 +111,7 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
           </div>
 
           {/* List of categories with subcategories nested */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '220px', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '260px', overflowY: 'auto' }}>
             {topCategories.map((cat) => {
               const subs = getSubcategories(cat.id);
               return (
@@ -135,13 +138,15 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
                     >
                       {cat.name}
                     </span>
-                    <button
-                      onClick={() => onDeleteCategory(cat.id)}
-                      style={{ background: 'none', border: 'none', color: '#777', cursor: 'pointer', padding: '4px' }}
-                      title={`Delete ${cat.name}`}
-                    >
-                      <X className="w-3.5 h-3.5 hover:text-red-400" />
-                    </button>
+                    {!isMobileViewer && (
+                      <button
+                        onClick={() => onDeleteCategory(cat.id)}
+                        style={{ background: 'none', border: 'none', color: '#777', cursor: 'pointer', padding: '4px' }}
+                        title={`Delete ${cat.name}`}
+                      >
+                        <X className="w-3.5 h-3.5 hover:text-red-400" />
+                      </button>
+                    )}
                   </div>
 
                   {/* Subcategories list */}
@@ -169,13 +174,15 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
                         <CornerDownRight className="w-3 h-3 text-gray-500" />
                         <span>{sub.name}</span>
                       </div>
-                      <button
-                        onClick={() => onDeleteCategory(sub.id)}
-                        style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: '2px' }}
-                        title={`Delete ${sub.name}`}
-                      >
-                        <X className="w-3 h-3 hover:text-red-400" />
-                      </button>
+                      {!isMobileViewer && (
+                        <button
+                          onClick={() => onDeleteCategory(sub.id)}
+                          style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: '2px' }}
+                          title={`Delete ${sub.name}`}
+                        >
+                          <X className="w-3 h-3 hover:text-red-400" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -183,106 +190,108 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
             })}
           </div>
 
-          {/* Add Category / Subcategory Form */}
-          <form
-            onSubmit={handleCreateCategory}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '10px',
-              paddingTop: '12px',
-              borderTop: '1px solid var(--border)',
-            }}
-          >
-            <div style={{ display: 'flex', gap: '6px' }}>
-              <input
-                type="text"
-                value={newCatName}
-                onChange={(e) => setNewCatName(e.target.value)}
-                placeholder="Category name..."
-                style={{
-                  flex: 1,
-                  fontSize: '13px',
-                  backgroundColor: 'var(--input-bg)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '10px',
-                  padding: '8px 12px',
-                  color: 'var(--text-main)',
-                  outline: 'none',
-                }}
-              />
-              <button
-                type="submit"
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: 'var(--liverpool)',
-                  color: '#fff',
-                  borderRadius: '10px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  boxShadow: '0 0 12px var(--liverpool-glow)',
-                }}
-              >
-                Add
-              </button>
-            </div>
-
-            {/* Parent Category Selector */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>
-                Nest under (Optional Parent):
-              </span>
-              <div style={{ position: 'relative', width: '100%' }}>
-                <select
-                  value={selectedParentId}
-                  onChange={(e) => setSelectedParentId(e.target.value)}
+          {/* Add Category / Subcategory Form - ONLY on Desktop */}
+          {!isMobileViewer && (
+            <form
+              onSubmit={handleCreateCategory}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                paddingTop: '12px',
+                borderTop: '1px solid var(--border)',
+              }}
+            >
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <input
+                  type="text"
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  placeholder="Category name..."
                   style={{
-                    width: '100%',
+                    flex: 1,
+                    fontSize: '13px',
                     backgroundColor: 'var(--input-bg)',
                     border: '1px solid var(--border)',
                     borderRadius: '10px',
-                    padding: '8px 36px 8px 12px',
-                    fontSize: '12px',
+                    padding: '8px 12px',
                     color: 'var(--text-main)',
                     outline: 'none',
-                    appearance: 'none',
-                    WebkitAppearance: 'none',
-                    MozAppearance: 'none',
-                    cursor: 'pointer',
                   }}
-                >
-                  <option value="" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-main)' }}>
-                    None (Top-Level Category)
-                  </option>
-                  {topCategories.map((c) => (
-                    <option key={c.id} value={c.id} style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-main)' }}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-
-                {/* Custom Chevron Arrow positioned 14px inside right edge */}
-                <div
+                />
+                <button
+                  type="submit"
                   style={{
-                    position: 'absolute',
-                    right: '14px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    pointerEvents: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    color: 'var(--text-muted)',
+                    padding: '8px 16px',
+                    backgroundColor: 'var(--liverpool)',
+                    color: '#fff',
+                    borderRadius: '10px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    boxShadow: '0 0 12px var(--liverpool-glow)',
                   }}
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
+                  Add
+                </button>
+              </div>
+
+              {/* Parent Category Selector */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>
+                  Nest under (Optional Parent):
+                </span>
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <select
+                    value={selectedParentId}
+                    onChange={(e) => setSelectedParentId(e.target.value)}
+                    style={{
+                      width: '100%',
+                      backgroundColor: 'var(--input-bg)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '10px',
+                      padding: '8px 36px 8px 12px',
+                      fontSize: '12px',
+                      color: 'var(--text-main)',
+                      outline: 'none',
+                      appearance: 'none',
+                      WebkitAppearance: 'none',
+                      MozAppearance: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <option value="" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-main)' }}>
+                      None (Top-Level Category)
+                    </option>
+                    {topCategories.map((c) => (
+                      <option key={c.id} value={c.id} style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-main)' }}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Custom Chevron Arrow positioned 14px inside right edge */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      right: '14px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      pointerEvents: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </div>
                 </div>
               </div>
-            </div>
-          </form>
+            </form>
+          )}
         </div>
       )}
 

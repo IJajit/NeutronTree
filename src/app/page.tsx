@@ -168,11 +168,14 @@ export default function Home() {
 
           if (cloudMeta) {
             if (cloudMeta.categories && cloudMeta.categories.length > 0) {
+              await db.categories.clear();
               for (const c of cloudMeta.categories) {
                 await db.categories.put(c);
               }
-              const mergedCats = await db.categories.orderBy('order').toArray();
-              setCategories(mergedCats);
+              setCategories(cloudMeta.categories);
+            }
+            if (cloudMeta.viewport) {
+              setViewport(cloudMeta.viewport);
             }
             if (cloudMeta.activeCategory) {
               setActiveCategory(cloudMeta.activeCategory);
@@ -191,7 +194,7 @@ export default function Home() {
     const timer = setTimeout(async () => {
       try {
         await db.boardState.update('main', { viewport, activeCategory });
-        if (isDriveConnected && categories.length > 0) {
+        if (!isMobile && isDriveConnected && categories.length > 0) {
           syncBoardStateToDrive({
             categories,
             viewport,
