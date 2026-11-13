@@ -541,7 +541,8 @@ export default function Home() {
       const t1 = e.touches[0];
       const t2 = e.touches[1];
       const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-      if (currentDist <= 0) return;
+      // Ignore jittery micro-movements during pinch initiation
+      if (currentDist < 5) return;
 
       const scale = currentDist / touchStartDistRef.current;
       const newZoom = Math.min(Math.max(0.2, touchStartZoomRef.current * scale), 2.5);

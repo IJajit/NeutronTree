@@ -146,18 +146,21 @@ body {
 /* Card Container Stacking & Smooth Hover Physics */
 .card-container-wrapper {
   transition: opacity 0.2s ease;
+  contain: layout style;
 }
 
-.card-container-wrapper:hover {
-  z-index: 25;
-}
+@media (hover: hover) and (pointer: fine) {
+  .card-container-wrapper:hover {
+    z-index: 25;
+  }
 
-.card-container-wrapper:hover .card-body-shell {
-  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.65), 0 6px 16px -4px rgba(0, 0, 0, 0.4);
-}
+  .card-container-wrapper:hover .card-body-shell {
+    box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.65), 0 6px 16px -4px rgba(0, 0, 0, 0.4);
+  }
 
-[data-theme="light"] .card-container-wrapper:hover .card-body-shell {
-  box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.12), 0 6px 14px -4px rgba(0, 0, 0, 0.06);
+  [data-theme="light"] .card-container-wrapper:hover .card-body-shell {
+    box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.12), 0 6px 14px -4px rgba(0, 0, 0, 0.06);
+  }
 }
 .filter-pill {
   color: var(--text-muted);

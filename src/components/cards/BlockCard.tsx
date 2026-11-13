@@ -151,7 +151,7 @@ export const BlockCard: React.FC<BlockCardProps> = ({
           ? '0 0 25px var(--liverpool-glow), var(--card-shadow)'
           : 'var(--card-shadow)',
         overflow: 'hidden',
-        transition: 'border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease',
+        transition: 'border-color 0.15s ease, background-color 0.2s ease',
       }}
     >
       {/* Top Floating Actions: ONLY shown when NOT in edit mode */}
