@@ -543,15 +543,15 @@ export async function syncNodeToGoogleDrive(
         imgBlob = dataUrlToBlob(node.data.thumbnailUrl, node.data.mimeType || 'image/png');
       } else if (node.data.thumbnailUrl?.startsWith('http')) {
         try {
-          // Use 4s abort timeout so unreachable/slow external links or CORS issues never hang sync
+          // Use 2.5s abort timeout so unreachable/slow external links or CORS issues never stall sync
           const fetchImg = await fetch(node.data.thumbnailUrl, {
-            signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined,
+            signal: AbortSignal.timeout ? AbortSignal.timeout(2500) : undefined,
           });
           if (fetchImg.ok) {
             imgBlob = await fetchImg.blob();
           }
-        } catch (e) {
-          console.warn('Could not fetch external image directly (skipping binary upload):', e);
+        } catch {
+          // Ignore external image download errors (preview images hosted on external CDN)
         }
       }
 
@@ -579,39 +579,30 @@ export async function syncNodeToGoogleDrive(
       await uploadMediaFileToDrive(noteFileName, 'text/markdown', noteContent, categoryFolderId, token);
     }
 
-    // 2. Upload canvas coordinate state JSON & clean up any duplicates across any other folder
+    // 2. Upload canvas coordinate state JSON directly to the target category folder
     const fileName = `${node.id}.json`;
     const fileContent = JSON.stringify(node, null, 2);
 
-    // Search for all instances of this JSON across Drive
+    // Check directly inside target category folder
     const searchRes = await authenticatedFetch(
       `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
-        `name = '${fileName}' and trashed = false`
-      )}&fields=files(id, parents)`,
+        `name = '${fileName}' and '${categoryFolderId}' in parents and trashed = false`
+      )}&fields=files(id)`,
       {
         headers: { Authorization: `Bearer ${token}` },
       }
     );
 
-    const searchData = await searchRes.json();
-    const existingFiles: Array<{ id: string; parents?: string[] }> = searchData.files || [];
-
-    const existingInTarget = existingFiles.find((f) => f.parents?.includes(categoryFolderId));
-    // Trash any duplicate JSON files in other folders (e.g. from prior category moves)
-    for (const oldFile of existingFiles) {
-      if (oldFile.id !== existingInTarget?.id) {
-        await authenticatedFetch(`https://www.googleapis.com/drive/v3/files/${oldFile.id}`, {
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ trashed: true }),
-        });
-      }
+    let existingId: string | null = null;
+    if (searchRes.ok) {
+      const searchData = await searchRes.json();
+      existingId = searchData.files?.[0]?.id || null;
     }
 
-    if (existingInTarget) {
-      // Update existing file content
+    if (existingId) {
+      // Update existing file content in place
       await authenticatedFetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${existingInTarget.id}?uploadType=media`,
+        `https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=media`,
         {
           method: 'PATCH',
           headers: {
@@ -621,7 +612,7 @@ export async function syncNodeToGoogleDrive(
           body: fileContent,
         }
       );
-      return existingInTarget.id;
+      return existingId;
     } else {
       const form = new FormData();
       form.append(
@@ -643,9 +634,11 @@ export async function syncNodeToGoogleDrive(
           body: form,
         }
       );
-
-      const uploadData = await uploadRes.json();
-      return uploadData.id;
+      if (uploadRes.ok) {
+        const uploadData = await uploadRes.json();
+        return uploadData.id || null;
+      }
+      return null;
     }
   } catch (err) {
     console.warn('Google Drive sync error:', err);
