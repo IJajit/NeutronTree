@@ -55,6 +55,7 @@ export default function Home() {
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [quickAddInitialType, setQuickAddInitialType] = useState<MediaType>('link');
   const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
+  const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
   const [isDriveConnected, setIsDriveConnected] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -323,8 +324,11 @@ export default function Home() {
         e.stopPropagation();
 
         setSelectedNodeId(null);
+        setSelectedNodeIds(new Set());
         setIsQuickAddOpen(false);
         setIsDriveModalOpen(false);
+        setIsCategoryMenuOpen(false);
+        setIsSearchOpen(false);
 
         // Always set category back to 'all'
         setActiveCategory('all');
@@ -720,6 +724,23 @@ export default function Home() {
     }
   };
   const handleWheel = (e: React.WheelEvent) => {
+    // If the wheel event originated from inside an open modal or scrollable menu, allow native scrolling and DO NOT zoom canvas
+    const target = e.target as HTMLElement | null;
+    if (
+      target &&
+      (target.closest('[role="dialog"]') ||
+        target.closest('.glass-dock-container') ||
+        target.closest('.category-popover-menu') ||
+        target.closest('.quick-add-modal-body') ||
+        target.closest('.drive-modal-body') ||
+        target.closest('form') ||
+        target.closest('input') ||
+        target.closest('textarea') ||
+        target.closest('select'))
+    ) {
+      return;
+    }
+
     e.preventDefault();
     const zoomFactor = e.deltaY < 0 ? 1.05 : 0.95;
     const newZoom = Math.min(Math.max(0.2, viewport.zoom * zoomFactor), 2.5);
@@ -1097,6 +1118,8 @@ export default function Home() {
         onToggleSearch={() => setIsSearchOpen(!isSearchOpen)}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        isCategoryMenuOpen={isCategoryMenuOpen}
+        onToggleCategoryMenu={setIsCategoryMenuOpen}
       />
 
       {/* Top-Left Controls: Theme Toggle + Zoom Controls (keeps bottom clean for dock pill) */}

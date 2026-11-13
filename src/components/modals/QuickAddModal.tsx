@@ -40,6 +40,18 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
     }
   }, [initialType]);
 
+  // Support pressing Escape to close the modal
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key === 'Esc' || e.keyCode === 27) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleEsc, true);
+    return () => window.removeEventListener('keydown', handleEsc, true);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -94,7 +106,10 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
       onClick={onClose}
+      onWheel={(e) => e.stopPropagation()}
       style={{
         position: 'fixed',
         inset: 0,
@@ -112,7 +127,9 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
       }}
     >
       <div
+        className="quick-add-modal-body"
         onClick={(e) => e.stopPropagation()}
+        onWheel={(e) => e.stopPropagation()}
         style={{
           backgroundColor: '#121212',
           border: '1px solid rgba(255, 255, 255, 0.12)',

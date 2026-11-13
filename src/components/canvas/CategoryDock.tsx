@@ -34,6 +34,8 @@ interface CategoryDockProps {
   onToggleSearch?: () => void;
   searchQuery?: string;
   onSearchChange?: (q: string) => void;
+  isCategoryMenuOpen?: boolean;
+  onToggleCategoryMenu?: (open: boolean) => void;
 }
 
 export const CategoryDock: React.FC<CategoryDockProps> = ({
@@ -53,11 +55,33 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
   onToggleSearch,
   searchQuery = '',
   onSearchChange,
+  isCategoryMenuOpen,
+  onToggleCategoryMenu,
 }) => {
-  const [showCategoryPopover, setShowCategoryPopover] = useState(false);
+  const [internalPopover, setInternalPopover] = useState(false);
+  const showCategoryPopover = isCategoryMenuOpen !== undefined ? isCategoryMenuOpen : internalPopover;
+  const setShowCategoryPopover = (open: boolean) => {
+    if (onToggleCategoryMenu) {
+      onToggleCategoryMenu(open);
+    } else {
+      setInternalPopover(open);
+    }
+  };
   const [newCatName, setNewCatName] = useState('');
   const [selectedParentId, setSelectedParentId] = useState<string>('');
   const [hoveredCatId, setHoveredCatId] = useState<string | null>(null);
+
+  // Close menus on Escape key
+  React.useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key === 'Esc' || e.keyCode === 27) {
+        setShowCategoryPopover(false);
+        setHoveredCatId(null);
+      }
+    };
+    window.addEventListener('keydown', handleEsc, true);
+    return () => window.removeEventListener('keydown', handleEsc, true);
+  }, []);
 
   // Split into Top-level Categories and Subcategories
   const topCategories = categories.filter((c) => !c.parentId);
@@ -77,7 +101,9 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
       {/* Category Manager Floating Popover */}
       {showCategoryPopover && (
         <div
+          className="category-popover-menu"
           onClick={(e) => e.stopPropagation()}
+          onWheel={(e) => e.stopPropagation()}
           style={{
             position: 'absolute',
             bottom: 'calc(100% + 14px)',
