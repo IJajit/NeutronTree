@@ -12,7 +12,8 @@ import {
   Plus,
   Smartphone,
   Search,
-  Eye
+  Eye,
+  RefreshCw
 } from 'lucide-react';
 import { Category, MediaType } from '@/lib/types/canvas';
 
@@ -459,16 +460,16 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
         </div>
 
 
-        {/* Mobile Search Popover / Input Bar */}
-        {isMobileViewer && isSearchOpen && (
+        {/* Search Popover / Input Bar */}
+        {isSearchOpen && (
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
               position: 'absolute',
-              bottom: 'calc(100% + 14px)',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: 'min(90vw, 360px)',
+              bottom: 'calc(100% + 12px)',
+              left: 0,
+              right: 0,
+              width: '100%',
               backgroundColor: 'var(--card-bg, rgba(16, 16, 16, 0.95))',
               backdropFilter: 'blur(24px)',
               border: '1px solid var(--border)',
@@ -479,6 +480,7 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
               alignItems: 'center',
               gap: '10px',
               zIndex: 120,
+              boxSizing: 'border-box',
             }}
           >
             <Search className="w-4 h-4 text-[var(--liverpool)] shrink-0" />
@@ -490,6 +492,7 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
               onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
               style={{
                 flex: 1,
+                minWidth: 0,
                 background: 'transparent',
                 border: 'none',
                 outline: 'none',
@@ -508,9 +511,7 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
           </div>
         )}
 
-        <div className="w-[1px] h-4 mx-1 shrink-0" style={{ backgroundColor: 'var(--border)' }} />
-
-        {/* Mobile View: Search button & Viewer Badge */}
+        {/* Mobile View: Search -> Refresh -> Cloud (no divider line) */}
         {isMobileViewer ? (
           <>
             <button
@@ -520,9 +521,31 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
             >
               <Search className="w-4 h-4" />
             </button>
+
+            <button
+              onClick={() => window.location.reload()}
+              className="glass-circle-btn touch-manipulation"
+              title="Refresh website"
+            >
+              <RefreshCw className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+            </button>
+
+            {/* Google Drive Button & Direct Cloud Sync Button */}
+            <button
+              onClick={onOpenDriveModal}
+              className="glass-circle-btn touch-manipulation"
+              title={isDriveConnected ? 'Google Drive (Connected) - Click to manage & sync' : 'Connect Google Drive'}
+            >
+              <Cloud
+                className={`w-4 h-4 ${isDriveConnected ? 'text-emerald-500' : ''} ${isSyncing ? 'animate-pulse' : ''}`}
+                style={{ color: isDriveConnected ? undefined : 'var(--text-muted)' }}
+              />
+            </button>
           </>
         ) : (
           <>
+            <div className="w-[1px] h-4 mx-1 shrink-0" style={{ backgroundColor: 'var(--border)' }} />
+
             {/* Desktop Full Media Creation Suite */}
             <button
               onClick={() => onOpenQuickAddType('link')}
@@ -563,25 +586,29 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
             >
               <Video className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
             </button>
+
+            {/* Desktop Search Button */}
+            <button
+              onClick={onToggleSearch}
+              className={`glass-circle-btn touch-manipulation ${isSearchOpen || searchQuery ? 'primary' : ''}`}
+              title="Search canvas blocks"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+
+            {/* Google Drive Button & Direct Cloud Sync Button */}
+            <button
+              onClick={onOpenDriveModal}
+              className="glass-circle-btn touch-manipulation"
+              title={isDriveConnected ? 'Google Drive (Connected) - Click to manage & sync' : 'Connect Google Drive'}
+            >
+              <Cloud
+                className={`w-4 h-4 ${isDriveConnected ? 'text-emerald-500' : ''} ${isSyncing ? 'animate-pulse' : ''}`}
+                style={{ color: isDriveConnected ? undefined : 'var(--text-muted)' }}
+              />
+            </button>
           </>
         )}
-
-
-        <div className="w-[1px] h-4 mx-1 shrink-0" style={{ backgroundColor: 'var(--border)' }} />
-
-
-
-        {/* Google Drive Button & Direct Cloud Sync Button */}
-        <button
-          onClick={onOpenDriveModal}
-          className="glass-circle-btn touch-manipulation"
-          title={isDriveConnected ? 'Google Drive (Connected) - Click to manage & sync' : 'Connect Google Drive'}
-        >
-          <Cloud
-            className={`w-4 h-4 ${isDriveConnected ? 'text-emerald-500' : ''} ${isSyncing ? 'animate-pulse' : ''}`}
-            style={{ color: isDriveConnected ? undefined : 'var(--text-muted)' }}
-          />
-        </button>
       </nav>
     </div>
   );

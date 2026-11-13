@@ -218,6 +218,19 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, [viewport, activeCategory, categories, isDriveConnected]);
 
+  // Google Drive 15-Minute Auto-Sync
+  useEffect(() => {
+    if (!isDriveConnected) return;
+
+    const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
+    const interval = setInterval(() => {
+      console.log('[Auto-Sync] Triggering 15-minute Google Drive background auto-sync...');
+      handleManualSyncWithDrive();
+    }, FIFTEEN_MINUTES_MS);
+
+    return () => clearInterval(interval);
+  }, [isDriveConnected, nodes, categories, viewport, activeCategory]);
+
   // Global Clipboard Paste Handler
   useEffect(() => {
     const handlePaste = async (e: ClipboardEvent) => {
