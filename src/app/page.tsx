@@ -125,11 +125,12 @@ export default function Home() {
 
       // Always populate local database items first so user never sees an empty screen
       const catIdSet = new Set(allCats.map((c) => c.id));
+      const fallbackCatId = allCats[0]?.id || 'uncategorized';
       const healedNodes = await Promise.all(
         allNodes.map(async (n) => {
-          if (n.category !== 'general' && !catIdSet.has(n.category)) {
-            await db.nodes.update(n.id, { category: 'general', updatedAt: Date.now() });
-            return { ...n, category: 'general' };
+          if (!n.category || !catIdSet.has(n.category)) {
+            await db.nodes.update(n.id, { category: fallbackCatId, updatedAt: Date.now() });
+            return { ...n, category: fallbackCatId };
           }
           return n;
         })
@@ -742,19 +743,23 @@ export default function Home() {
 
   const handleDeleteCategory = async (id: string) => {
     const catToDelete = categories.find((c) => c.id === id);
+    const remainingCats = categories.filter((c) => c.id !== id);
+    const fallbackCat = remainingCats[0]?.id || 'uncategorized';
+
     await db.categories.delete(id);
-    setCategories((prev) => prev.filter((c) => c.id !== id));
+    setCategories(remainingCats);
 
     const affectedNodes = nodes.filter((n) => n.category === id);
     for (const node of affectedNodes) {
-      await db.nodes.update(node.id, { category: 'general', updatedAt: Date.now() });
+      await db.nodes.update(node.id, { category: fallbackCat, updatedAt: Date.now() });
       if (isDriveConnected) {
-        syncNodeToGoogleDrive({ ...node, category: 'general', updatedAt: Date.now() });
+        const catName = remainingCats.find((c) => c.id === fallbackCat)?.name;
+        syncNodeToGoogleDrive({ ...node, category: fallbackCat, updatedAt: Date.now() }, catName);
       }
     }
 
     setNodes((prev) =>
-      prev.map((n) => (n.category === id ? { ...n, category: 'general', updatedAt: Date.now() } : n))
+      prev.map((n) => (n.category === id ? { ...n, category: fallbackCat, updatedAt: Date.now() } : n))
     );
 
     if (activeCategory === id) {
@@ -835,7 +840,8 @@ export default function Home() {
 
     // Sync to Google Drive if connected
     if (isDriveConnected) {
-      syncNodeToGoogleDrive(newNode);
+      const catObj = categories.find((c) => c.id === newNode.category);
+      syncNodeToGoogleDrive(newNode, catObj?.name);
     }
   };
 
@@ -846,7 +852,8 @@ export default function Home() {
         if (n.id === id) {
           const updated = { ...n, ...partial } as BlockNode;
           if (isDriveConnected) {
-            syncNodeToGoogleDrive(updated);
+            const catObj = categories.find((c) => c.id === updated.category);
+            syncNodeToGoogleDrive(updated, catObj?.name);
           }
           return updated;
         }

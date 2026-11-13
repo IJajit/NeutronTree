@@ -446,13 +446,18 @@ function dataUrlToBlob(dataUrl: string, fallbackMime: string): Blob {
  * along with the companion index JSON for canvas reconstruction.
  * Automatically removes any duplicate files in other categories to prevent duplicates.
  */
-export async function syncNodeToGoogleDrive(node: BlockNode): Promise<string | null> {
+export async function syncNodeToGoogleDrive(
+  node: BlockNode,
+  categoryName?: string
+): Promise<string | null> {
   const token = getStoredAccessToken();
   if (!token) return null;
 
   try {
     const rootFolderId = await getOrCreateDriveFolder('NeuronTree');
-    const categoryFolderId = await getOrCreateDriveFolder(node.category || 'general', rootFolderId);
+    // Use human category name (e.g. "Resources", "Inspiration") or fallback safely
+    const targetCategoryFolderName = categoryName || node.category || 'General';
+    const categoryFolderId = await getOrCreateDriveFolder(targetCategoryFolderName, rootFolderId);
 
     // 1. Upload the real, accessible user asset (Images, PDFs, Links, Markdown Notes)
     const cleanTitle = (node.data.title || node.id).replace(/[\\/:*?"<>|]/g, '_').trim();
@@ -713,9 +718,16 @@ export async function cleanWipeAndResyncDrive(nodes: BlockNode[], bundle: CloudB
     // 2. Resync clean meta board state
     await syncBoardStateToDrive(bundle);
 
-    // 3. Resync all current nodes cleanly
+    // Build category ID -> category human name mapping
+    const catMap = new Map<string, string>();
+    bundle.categories.forEach((cat) => {
+      catMap.set(cat.id, cat.name);
+    });
+
+    // 3. Resync all current nodes cleanly under their human category folder names
     for (const node of nodes) {
-      await syncNodeToGoogleDrive(node);
+      const resolvedCatName = catMap.get(node.category) || node.category;
+      await syncNodeToGoogleDrive(node, resolvedCatName);
     }
   } catch (err) {
     console.warn('Error during clean wipe & resync of Google Drive:', err);

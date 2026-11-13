@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Cloud, CheckCircle2, X, Loader2, AlertCircle } from 'lucide-react';
+import { Cloud, Check, X, Loader2, AlertCircle } from 'lucide-react';
 import {
-  requestGoogleDriveAuth,
   redirectToGoogleOAuth,
   setStoredAccessToken,
-  getStoredAccessToken,
   DEFAULT_CLIENT_ID,
 } from '@/lib/drive/googleDrive';
 
@@ -28,6 +26,7 @@ export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
   const [clientId, setClientId] = useState(DEFAULT_CLIENT_ID);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showSyncedSuccess, setShowSyncedSuccess] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -67,6 +66,18 @@ export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
     setStoredAccessToken(null);
     onConnectDrive(false);
     setErrorMessage(null);
+  };
+
+  const handleSyncClick = async () => {
+    if (!onManualSync || isSyncing) return;
+    try {
+      setShowSyncedSuccess(false);
+      await onManualSync();
+      setShowSyncedSuccess(true);
+      setTimeout(() => setShowSyncedSuccess(false), 3500);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (
@@ -131,47 +142,28 @@ export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
         </div>
 
         <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
-          {/* Credentials Input with inline Synced / Status pill */}
+          {/* Credentials Input with clean tick mark next to Credentials label */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>
-                Credentials
-              </label>
-              {isDriveConnected ? (
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    color: '#34d399',
-                    fontSize: '11px',
-                    fontWeight: 500,
-                    backgroundColor: 'rgba(52, 211, 153, 0.1)',
-                    border: '1px solid rgba(52, 211, 153, 0.25)',
-                    padding: '2px 8px',
-                    borderRadius: '9999px',
-                  }}
-                >
-                  <CheckCircle2 className="w-3 h-3" /> Synced
-                </span>
-              ) : (
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    color: '#fbbf24',
-                    fontSize: '11px',
-                    fontWeight: 500,
-                    backgroundColor: 'rgba(251, 191, 36, 0.1)',
-                    border: '1px solid rgba(251, 191, 36, 0.25)',
-                    padding: '2px 8px',
-                    borderRadius: '9999px',
-                  }}
-                >
-                  Disconnected
-                </span>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>
+                  Credentials
+                </label>
+                {isDriveConnected && (
+                  <span
+                    title="Connected to Google Drive"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#10b981',
+                      lineHeight: 1,
+                    }}
+                  >
+                    <Check className="w-4 h-4 stroke-[2.5]" />
+                  </span>
+                )}
+              </div>
             </div>
             <input
               type="text"
@@ -240,30 +232,38 @@ export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
             </button>
             {isDriveConnected && onManualSync && (
               <button
-                onClick={async () => {
-                  try {
-                    await onManualSync();
-                  } catch (e) {
-                    console.error(e);
-                  }
-                }}
+                onClick={handleSyncClick}
                 disabled={isSyncing || isAuthenticating}
                 style={{
                   padding: '9px 18px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                  color: '#ffffff',
+                  backgroundColor: showSyncedSuccess ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                  color: showSyncedSuccess ? '#10b981' : '#ffffff',
                   borderRadius: '9999px',
                   fontSize: '13px',
                   fontWeight: 500,
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  border: showSyncedSuccess
+                    ? '1px solid rgba(16, 185, 129, 0.35)'
+                    : '1px solid rgba(255, 255, 255, 0.15)',
                   cursor: isSyncing ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
+                  gap: '6px',
+                  transition: 'all 0.2s ease',
                 }}
               >
-                {isSyncing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                {isSyncing ? 'Syncing...' : 'Sync'}
+                {isSyncing ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Syncing...</span>
+                  </>
+                ) : showSyncedSuccess ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>Synced</span>
+                  </>
+                ) : (
+                  <span>Sync</span>
+                )}
               </button>
             )}
             <button
