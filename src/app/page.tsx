@@ -913,6 +913,11 @@ export default function Home() {
       return;
     }
     setIsSyncingDrive(true);
+    // Timeout safeguard: ensures UI sync state never stays stuck beyond 30 seconds
+    const safetyTimer = setTimeout(() => {
+      setIsSyncingDrive(false);
+    }, 30000);
+
     try {
       if (nodes.length > 0) {
         // Clean wipe of Google Drive folder and cleanly resync active board state and nodes
@@ -957,6 +962,7 @@ export default function Home() {
     } catch (err) {
       console.warn('Manual sync error:', err);
     } finally {
+      clearTimeout(safetyTimer);
       setIsSyncingDrive(false);
     }
   };

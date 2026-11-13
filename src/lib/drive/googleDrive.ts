@@ -300,26 +300,41 @@ export async function pullNodesFromGoogleDrive(): Promise<BlockNode[]> {
     return [];
   }
 }
+// In-memory cache for folder IDs to minimize Drive API roundtrips
+const folderIdCache = new Map<string, string>();
+
+export function clearFolderIdCache() {
+  folderIdCache.clear();
+}
+
 async function getOrCreateDriveFolder(folderName: string, parentId?: string): Promise<string> {
   const token = getStoredAccessToken();
   if (!token) throw new Error('Missing Google Drive access token');
 
+  const cacheKey = `${parentId || 'root'}:${folderName}`;
+  if (folderIdCache.has(cacheKey)) {
+    return folderIdCache.get(cacheKey)!;
+  }
+
   // Search if folder already exists
-  let query = `name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+  let query = `name = '${folderName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
   if (parentId) {
     query += ` and '${parentId}' in parents`;
   }
 
   const searchRes = await authenticatedFetch(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`,
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&pageSize=5`,
     {
       headers: { Authorization: `Bearer ${token}` },
     }
   );
 
-  const searchData = await searchRes.json();
-  if (searchData.files && searchData.files.length > 0) {
-    return searchData.files[0].id;
+  if (searchRes.ok) {
+    const searchData = await searchRes.json();
+    if (searchData.files && searchData.files.length > 0) {
+      folderIdCache.set(cacheKey, searchData.files[0].id);
+      return searchData.files[0].id;
+    }
   }
 
   // Create folder if not found
@@ -336,8 +351,15 @@ async function getOrCreateDriveFolder(folderName: string, parentId?: string): Pr
     }),
   });
 
-  const createData = await createRes.json();
-  return createData.id;
+  if (createRes.ok) {
+    const createData = await createRes.json();
+    if (createData.id) {
+      folderIdCache.set(cacheKey, createData.id);
+      return createData.id;
+    }
+  }
+
+  return '';
 }
 
 /**
@@ -521,12 +543,15 @@ export async function syncNodeToGoogleDrive(
         imgBlob = dataUrlToBlob(node.data.thumbnailUrl, node.data.mimeType || 'image/png');
       } else if (node.data.thumbnailUrl?.startsWith('http')) {
         try {
-          const fetchImg = await fetch(node.data.thumbnailUrl);
+          // Use 4s abort timeout so unreachable/slow external links or CORS issues never hang sync
+          const fetchImg = await fetch(node.data.thumbnailUrl, {
+            signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined,
+          });
           if (fetchImg.ok) {
             imgBlob = await fetchImg.blob();
           }
         } catch (e) {
-          console.warn('Could not fetch external image directly:', e);
+          console.warn('Could not fetch external image directly (skipping binary upload):', e);
         }
       }
 
@@ -732,10 +757,14 @@ export async function trashCategoryOnGoogleDrive(categoryName: string): Promise<
  * Clean wipe of all files/folders inside /NeuronTree/ on Google Drive to eliminate
  * any orphaned folders (e.g. legacy 'general') or duplicated assets from prior sessions,
  * then cleanly push the current board state and all active blocks.
+ * Runs in parallel batches with caching so it finishes in a few seconds without hanging.
  */
 export async function cleanWipeAndResyncDrive(nodes: BlockNode[], bundle: CloudBoardSyncBundle): Promise<void> {
   const token = getStoredAccessToken();
   if (!token) return;
+
+  // Clear in-memory folder cache to ensure fresh hierarchy
+  clearFolderIdCache();
 
   try {
     const rootFolderId = await getOrCreateDriveFolder('NeuronTree');
@@ -750,27 +779,51 @@ export async function cleanWipeAndResyncDrive(nodes: BlockNode[], bundle: CloudB
 
     if (searchRes.ok) {
       const searchData = await searchRes.json();
-      const files = searchData.files || [];
+      const files: Array<{ id: string; name: string }> = searchData.files || [];
 
-      // Trash all old/orphan contents in root folder
-      for (const file of files) {
-        await authenticatedFetch(`https://www.googleapis.com/drive/v3/files/${file.id}`, {
-          method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ trashed: true }),
-        });
+      // Trash all old/orphan contents in root folder in parallel chunks of 10
+      const chunkSize = 10;
+      for (let i = 0; i < files.length; i += chunkSize) {
+        const chunk = files.slice(i, i + chunkSize);
+        await Promise.allSettled(
+          chunk.map((file) =>
+            authenticatedFetch(`https://www.googleapis.com/drive/v3/files/${file.id}`, {
+              method: 'PATCH',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ trashed: true }),
+            })
+          )
+        );
       }
     }
 
     // 2. Resync clean meta board state
     await syncBoardStateToDrive(bundle);
 
-    // 3. Resync all current nodes cleanly under their human category folder names with nested subcategories
-    for (const node of nodes) {
-      await syncNodeToGoogleDrive(node, bundle.categories);
+    // 3. Pre-create category and subcategory folders so nodes don't race creating them
+    if (bundle.categories && bundle.categories.length > 0) {
+      // Create parent categories first
+      const parents = bundle.categories.filter((c) => !c.parentId);
+      for (const parent of parents) {
+        await getCategoryDriveFolder(parent.id, bundle.categories);
+      }
+      // Create subcategories next
+      const children = bundle.categories.filter((c) => !!c.parentId);
+      for (const child of children) {
+        await getCategoryDriveFolder(child.id, bundle.categories);
+      }
+    }
+
+    // 4. Resync all current nodes in parallel chunks of 4
+    const nodeChunkSize = 4;
+    for (let i = 0; i < nodes.length; i += nodeChunkSize) {
+      const chunk = nodes.slice(i, i + nodeChunkSize);
+      await Promise.allSettled(
+        chunk.map((node) => syncNodeToGoogleDrive(node, bundle.categories))
+      );
     }
   } catch (err) {
     console.warn('Error during clean wipe & resync of Google Drive:', err);
