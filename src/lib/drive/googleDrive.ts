@@ -236,10 +236,10 @@ export async function pullNodesFromGoogleDrive(): Promise<BlockNode[]> {
   if (!token) return [];
 
   try {
-    // 1. Search for all .json block state files in Google Drive created by this app
-    const query = `mimeType = 'application/json' and name contains 'block-' and trashed = false`;
+    // 1. Search for all .json block state files in Google Drive created by this app (.json files ending with .json)
+    const query = `mimeType = 'application/json' and name contains '.json' and name != 'neuron_tree_board_meta.json' and trashed = false`;
     const searchRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&pageSize=100`,
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&pageSize=500`,
       {
         headers: { Authorization: `Bearer ${token}` },
       }

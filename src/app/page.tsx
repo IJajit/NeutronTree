@@ -8,6 +8,7 @@ import { CategoryDock } from '@/components/canvas/CategoryDock';
 import { Minimap } from '@/components/canvas/Minimap';
 import { QuickAddModal } from '@/components/modals/QuickAddModal';
 import { DriveSettingsModal } from '@/components/modals/DriveSettingsModal';
+import { DeviceSyncModal } from '@/components/modals/DeviceSyncModal';
 import { Undo2, ZoomIn, ZoomOut, Maximize2, Sun, Moon } from 'lucide-react';
 import {
   getStoredAccessToken,
@@ -54,6 +55,7 @@ export default function Home() {
   const [quickAddInitialType, setQuickAddInitialType] = useState<MediaType>('link');
   const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
   const [isDriveConnected, setIsDriveConnected] = useState(false);
+  const [isDeviceSyncModalOpen, setIsDeviceSyncModalOpen] = useState(false);
   const [isSyncingDrive, setIsSyncingDrive] = useState(false);
   const [recentlyDeleted, setRecentlyDeleted] = useState<BlockNode | null>(null);
   const [showUndoToast, setShowUndoToast] = useState(false);
@@ -1004,6 +1006,7 @@ export default function Home() {
         onDeleteCategory={handleDeleteCategory}
         onOpenQuickAddType={handleOpenDirectType}
         onOpenDriveModal={() => setIsDriveModalOpen(true)}
+        onOpenDeviceSyncModal={() => setIsDeviceSyncModalOpen(true)}
         onSyncWithDrive={handleManualSyncWithDrive}
         isSyncing={isSyncingDrive}
       />
@@ -1140,6 +1143,35 @@ export default function Home() {
         onClose={() => setIsDriveModalOpen(false)}
         isDriveConnected={isDriveConnected}
         onConnectDrive={(connected) => setIsDriveConnected(connected)}
+      />
+
+      <DeviceSyncModal
+        isOpen={isDeviceSyncModalOpen}
+        onClose={() => setIsDeviceSyncModalOpen(false)}
+        nodes={nodes}
+        categories={categories}
+        viewport={viewport}
+        activeCategory={activeCategory}
+        onRestoreBoard={async (restoredNodes, restoredCategories, restoredViewport) => {
+          // Replace local Dexie DB content with the synced cloud board
+          await db.nodes.clear();
+          for (const n of restoredNodes) {
+            await db.nodes.put(n);
+          }
+          if (restoredCategories && restoredCategories.length > 0) {
+            await db.categories.clear();
+            for (const c of restoredCategories) {
+              await db.categories.put(c);
+            }
+            setCategories(restoredCategories);
+          }
+          setNodes(restoredNodes);
+          if (restoredViewport) {
+            setViewport(restoredViewport);
+          } else {
+            centerCanvasOnNodes(restoredNodes);
+          }
+        }}
       />
     </div>
   );

@@ -100,11 +100,15 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         inset: 0,
         zIndex: 100,
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'center',
-        padding: '24px',
+        padding: '16px',
+        paddingTop: 'max(16px, env(safe-area-inset-top, 16px))',
+        paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
         backgroundColor: 'rgba(0, 0, 0, 0.82)',
         backdropFilter: 'blur(24px)',
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
       }}
     >
       <div
@@ -119,6 +123,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
+          maxHeight: 'min(92dvh, 850px)',
+          margin: 'auto 0',
         }}
       >
         {/* Top Action Bar: Media tabs + Close Button all in the same line! */}
@@ -199,7 +205,17 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        <form
+          onSubmit={handleSubmit}
+          style={{
+            padding: '24px 28px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '18px',
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
           <div>
             <label style={{ display: 'block', fontSize: '12px', color: '#aaaaaa', marginBottom: '8px', fontWeight: 500 }}>
               Category

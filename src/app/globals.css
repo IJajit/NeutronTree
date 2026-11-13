@@ -81,8 +81,8 @@ body {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: 1.5rem;
-  max-width: calc(100vw - 12px);
+  bottom: max(1.2rem, env(safe-area-inset-bottom, 1.2rem));
+  max-width: calc(100vw - 16px);
   width: max-content;
 }
 
@@ -94,7 +94,7 @@ body {
   border-radius: 9999px;
   justify-content: center;
   align-items: center;
-  padding: 5px 8px;
+  padding: 6px 10px;
   gap: 5px;
   display: flex;
   position: relative;

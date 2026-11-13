@@ -9,7 +9,8 @@ import {
   Video,
   FileText,
   CornerDownRight,
-  Plus
+  Plus,
+  Smartphone
 } from 'lucide-react';
 import { Category, MediaType } from '@/lib/types/canvas';
 
@@ -22,6 +23,7 @@ interface CategoryDockProps {
   onDeleteCategory: (id: string) => void;
   onOpenQuickAddType: (type: MediaType) => void;
   onOpenDriveModal: () => void;
+  onOpenDeviceSyncModal?: () => void;
   onSyncWithDrive?: () => void;
   isSyncing?: boolean;
 }
@@ -35,6 +37,7 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
   onDeleteCategory,
   onOpenQuickAddType,
   onOpenDriveModal,
+  onOpenDeviceSyncModal,
   onSyncWithDrive,
   isSyncing,
 }) => {
@@ -64,14 +67,18 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
           style={{
             position: 'absolute',
             bottom: 'calc(100% + 14px)',
-            left: '24px',
+            left: '12px',
+            maxWidth: 'calc(100vw - 24px)',
             backgroundColor: 'var(--card-bg, rgba(16, 16, 16, 0.94))',
             backdropFilter: 'blur(24px)',
             border: '1px solid var(--border)',
             borderRadius: '20px',
             padding: '18px',
             boxShadow: '0 20px 45px rgba(0, 0, 0, 0.9)',
-            width: '310px',
+            width: '320px',
+            maxHeight: 'min(75dvh, 520px)',
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
             zIndex: 120,
             display: 'flex',
             flexDirection: 'column',
@@ -474,6 +481,17 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
         </button>
 
         <div className="w-[1px] h-4 mx-1 shrink-0" style={{ backgroundColor: 'var(--border)' }} />
+
+        {/* Direct Device Link & PIN Sync Button */}
+        {onOpenDeviceSyncModal && (
+          <button
+            onClick={onOpenDeviceSyncModal}
+            className="glass-circle-btn touch-manipulation"
+            title="Link Desktop & Mobile (PIN Sync)"
+          >
+            <Smartphone className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+          </button>
+        )}
 
         {/* Google Drive Button & Direct Cloud Sync Button */}
         <button
