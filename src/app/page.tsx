@@ -172,7 +172,10 @@ export default function Home() {
             }
             const updatedNodes = await db.nodes.toArray();
             setNodes(updatedNodes);
-            centerCanvasOnNodes(updatedNodes);
+            // If local board was empty, center on nodes once loaded from cloud
+            if (healedNodes.length === 0) {
+              centerCanvasOnNodes(updatedNodes);
+            }
           }
 
           if (cloudMeta) {
@@ -183,7 +186,9 @@ export default function Home() {
               }
               setCategories(cloudMeta.categories);
             }
-            if (cloudMeta.viewport) {
+            // Only adopt cloud viewport if on desktop and viewport is within bounding area of nodes
+            const isSmallScreen = typeof window !== 'undefined' && window.innerWidth < 768;
+            if (!isSmallScreen && cloudMeta.viewport) {
               setViewport(cloudMeta.viewport);
             }
             if (cloudMeta.activeCategory) {
@@ -691,11 +696,16 @@ export default function Home() {
       ? Math.max(0.35, Math.min(fitZoom, 0.75))
       : Math.max(0.4, Math.min(fitZoom, 1.0));
 
-    setViewport({
-      x: screenW / 2 - centerX * initialZoom,
-      y: screenH / 2 - centerY * initialZoom,
-      zoom: Number(initialZoom.toFixed(2)),
-    });
+    // Guard against NaN or infinite coordinates
+    const targetX = screenW / 2 - centerX * initialZoom;
+    const targetY = screenH / 2 - centerY * initialZoom;
+    if (Number.isFinite(targetX) && Number.isFinite(targetY) && Number.isFinite(initialZoom)) {
+      setViewport({
+        x: targetX,
+        y: targetY,
+        zoom: Number(initialZoom.toFixed(2)),
+      });
+    }
   };
 
   const handleResetTo100 = () => {
@@ -727,16 +737,20 @@ export default function Home() {
     setActiveCategory(categoryId);
 
     if (categoryId !== 'all') {
-      const catNodes = nodes.filter((n) => n.category === categoryId);
-      if (catNodes.length > 0) {
-        const avgX = catNodes.reduce((acc, curr) => acc + curr.x, 0) / catNodes.length;
-        const avgY = catNodes.reduce((acc, curr) => acc + curr.y, 0) / catNodes.length;
+      // Find nodes matching this category or any child subcategories
+      const catNodes = nodes.filter((n) => {
+        if (n.category === categoryId) return true;
+        const nodeCat = categories.find((c) => c.id === n.category);
+        return nodeCat && nodeCat.parentId === categoryId;
+      });
 
-        setViewport({
-          x: window.innerWidth / 2 - avgX * 1,
-          y: window.innerHeight / 2 - avgY * 1,
-          zoom: 1.0,
-        });
+      if (catNodes.length > 0) {
+        centerCanvasOnNodes(catNodes);
+      }
+    } else {
+      // 'All' selected - center on all nodes
+      if (nodes.length > 0) {
+        centerCanvasOnNodes(nodes);
       }
     }
   };
