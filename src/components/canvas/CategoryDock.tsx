@@ -10,7 +10,9 @@ import {
   FileText,
   CornerDownRight,
   Plus,
-  Smartphone
+  Smartphone,
+  Search,
+  Eye
 } from 'lucide-react';
 import { Category, MediaType } from '@/lib/types/canvas';
 
@@ -26,6 +28,11 @@ interface CategoryDockProps {
   onOpenDeviceSyncModal?: () => void;
   onSyncWithDrive?: () => void;
   isSyncing?: boolean;
+  isMobileViewer?: boolean;
+  isSearchOpen?: boolean;
+  onToggleSearch?: () => void;
+  searchQuery?: string;
+  onSearchChange?: (q: string) => void;
 }
 
 export const CategoryDock: React.FC<CategoryDockProps> = ({
@@ -40,6 +47,11 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
   onOpenDeviceSyncModal,
   onSyncWithDrive,
   isSyncing,
+  isMobileViewer,
+  isSearchOpen,
+  onToggleSearch,
+  searchQuery = '',
+  onSearchChange,
 }) => {
   const [showCategoryPopover, setShowCategoryPopover] = useState(false);
   const [newCatName, setNewCatName] = useState('');
@@ -437,61 +449,118 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
           })}
         </div>
 
-        <div className="w-[1px] h-4 mx-1 shrink-0" style={{ backgroundColor: 'var(--border)' }} />
 
-        {/* Direct Individual Media Buttons - with compact touch target */}
-        <button
-          onClick={() => onOpenQuickAddType('link')}
-          className="glass-circle-btn touch-manipulation"
-          title="Add Link / Bookmark"
-        >
-          <Link className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-        </button>
-
-        <button
-          onClick={() => onOpenQuickAddType('note')}
-          className="glass-circle-btn touch-manipulation"
-          title="Add Note"
-        >
-          <Type className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-        </button>
-
-        <button
-          onClick={() => onOpenQuickAddType('image')}
-          className="glass-circle-btn touch-manipulation"
-          title="Add Image"
-        >
-          <Image className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-        </button>
-
-        <button
-          onClick={() => onOpenQuickAddType('document')}
-          className="glass-circle-btn touch-manipulation"
-          title="Add PDF / Document"
-        >
-          <FileText className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-        </button>
-
-        <button
-          onClick={() => onOpenQuickAddType('video')}
-          className="glass-circle-btn touch-manipulation"
-          title="Add Video"
-        >
-          <Video className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-        </button>
-
-        <div className="w-[1px] h-4 mx-1 shrink-0" style={{ backgroundColor: 'var(--border)' }} />
-
-        {/* Direct Device Link & PIN Sync Button */}
-        {onOpenDeviceSyncModal && (
-          <button
-            onClick={onOpenDeviceSyncModal}
-            className="glass-circle-btn touch-manipulation"
-            title="Link Desktop & Mobile (PIN Sync)"
+        {/* Mobile Search Popover / Input Bar */}
+        {isMobileViewer && isSearchOpen && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'absolute',
+              bottom: 'calc(100% + 14px)',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 'min(90vw, 360px)',
+              backgroundColor: 'var(--card-bg, rgba(16, 16, 16, 0.95))',
+              backdropFilter: 'blur(24px)',
+              border: '1px solid var(--border)',
+              borderRadius: '9999px',
+              padding: '6px 14px',
+              boxShadow: '0 20px 45px rgba(0, 0, 0, 0.9)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              zIndex: 120,
+            }}
           >
-            <Smartphone className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-          </button>
+            <Search className="w-4 h-4 text-[var(--liverpool)] shrink-0" />
+            <input
+              type="text"
+              autoFocus
+              placeholder="Search title, note, file or link..."
+              value={searchQuery}
+              onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
+              style={{
+                flex: 1,
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                fontSize: '13px',
+                color: 'var(--text-main)',
+              }}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => onSearchChange && onSearchChange('')}
+                style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '2px' }}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         )}
+
+        <div className="w-[1px] h-4 mx-1 shrink-0" style={{ backgroundColor: 'var(--border)' }} />
+
+        {/* Mobile View: Search button & Viewer Badge */}
+        {isMobileViewer ? (
+          <>
+            <button
+              onClick={onToggleSearch}
+              className={`glass-circle-btn touch-manipulation ${isSearchOpen || searchQuery ? 'primary' : ''}`}
+              title="Search canvas blocks"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+          </>
+        ) : (
+          <>
+            {/* Desktop Full Media Creation Suite */}
+            <button
+              onClick={() => onOpenQuickAddType('link')}
+              className="glass-circle-btn touch-manipulation"
+              title="Add Link / Bookmark"
+            >
+              <Link className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+            </button>
+
+            <button
+              onClick={() => onOpenQuickAddType('note')}
+              className="glass-circle-btn touch-manipulation"
+              title="Add Note"
+            >
+              <Type className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+            </button>
+
+            <button
+              onClick={() => onOpenQuickAddType('image')}
+              className="glass-circle-btn touch-manipulation"
+              title="Add Image"
+            >
+              <Image className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+            </button>
+
+            <button
+              onClick={() => onOpenQuickAddType('document')}
+              className="glass-circle-btn touch-manipulation"
+              title="Add PDF / Document"
+            >
+              <FileText className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+            </button>
+
+            <button
+              onClick={() => onOpenQuickAddType('video')}
+              className="glass-circle-btn touch-manipulation"
+              title="Add Video"
+            >
+              <Video className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+            </button>
+          </>
+        )}
+
+
+        <div className="w-[1px] h-4 mx-1 shrink-0" style={{ backgroundColor: 'var(--border)' }} />
+
+
 
         {/* Google Drive Button & Direct Cloud Sync Button */}
         <button

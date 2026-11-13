@@ -6,6 +6,7 @@ declare global {
   }
 }
 
+export const DEFAULT_CLIENT_ID = '523293829704-gos7rnsh1997a9ff87jkh9p90qvlmoac.apps.googleusercontent.com';
 const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 let tokenClient: any = null;
 let activeAccessToken: string | null = null;

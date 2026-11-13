@@ -5,6 +5,7 @@ import {
   redirectToGoogleOAuth,
   setStoredAccessToken,
   getStoredAccessToken,
+  DEFAULT_CLIENT_ID,
 } from '@/lib/drive/googleDrive';
 
 interface DriveSettingsModalProps {
@@ -20,13 +21,13 @@ export const DriveSettingsModal: React.FC<DriveSettingsModalProps> = ({
   isDriveConnected,
   onConnectDrive,
 }) => {
-  const [clientId, setClientId] = useState('');
+  const [clientId, setClientId] = useState(DEFAULT_CLIENT_ID);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedClientId = localStorage.getItem('gdrive_client_id') || '';
+      const savedClientId = localStorage.getItem('gdrive_client_id') || DEFAULT_CLIENT_ID;
       setClientId(savedClientId);
     }
   }, [isOpen]);

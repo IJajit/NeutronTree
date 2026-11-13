@@ -8,8 +8,7 @@ import { CategoryDock } from '@/components/canvas/CategoryDock';
 import { Minimap } from '@/components/canvas/Minimap';
 import { QuickAddModal } from '@/components/modals/QuickAddModal';
 import { DriveSettingsModal } from '@/components/modals/DriveSettingsModal';
-import { DeviceSyncModal } from '@/components/modals/DeviceSyncModal';
-import { Undo2, ZoomIn, ZoomOut, Maximize2, Sun, Moon } from 'lucide-react';
+import { Undo2, ZoomIn, ZoomOut, Maximize2, Sun, Moon, Search, Eye } from 'lucide-react';
 import {
   getStoredAccessToken,
   syncNodeToGoogleDrive,
@@ -55,6 +54,9 @@ export default function Home() {
   const [quickAddInitialType, setQuickAddInitialType] = useState<MediaType>('link');
   const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
   const [isDriveConnected, setIsDriveConnected] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isDeviceSyncModalOpen, setIsDeviceSyncModalOpen] = useState(false);
   const [isSyncingDrive, setIsSyncingDrive] = useState(false);
   const [recentlyDeleted, setRecentlyDeleted] = useState<BlockNode | null>(null);
@@ -67,6 +69,19 @@ export default function Home() {
 
   // Theme mode: 'dark' (default) or 'light'
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+      const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+      const isTouchOrSmall = mobileRegex.test(userAgent) || (typeof window !== 'undefined' && window.innerWidth <= 768);
+      setIsMobile(isTouchOrSmall);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('inspo-theme') as 'dark' | 'light' | null;
@@ -478,6 +493,7 @@ export default function Home() {
   };
 
   const handleStartDragNodeTouch = (e: React.TouchEvent, id: string) => {
+    if (isMobile) return;
     const touch = e.touches[0];
     const node = nodes.find((n) => n.id === id);
     if (!node || !touch) return;
@@ -926,6 +942,19 @@ export default function Home() {
       >
         {nodes.map((node) => {
           // Check if matches activeCategory directly, OR matches a subcategory of activeCategory
+          // Viewer search query filter
+          if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase().trim();
+            const titleMatch = (node.data.title || '').toLowerCase().includes(q);
+            const descMatch = (node.data.description || '').toLowerCase().includes(q);
+            const contentMatch = (node.data.content || '').toLowerCase().includes(q);
+            const fileNameMatch = (node.data.fileName || '').toLowerCase().includes(q);
+            const urlMatch = (node.data.url || '').toLowerCase().includes(q);
+            if (!titleMatch && !descMatch && !contentMatch && !fileNameMatch && !urlMatch) {
+              return null;
+            }
+          }
+
           const isCategoryMatch = (() => {
             if (activeCategory === 'all') return true;
             if (node.category === activeCategory) return true;
@@ -1006,9 +1035,13 @@ export default function Home() {
         onDeleteCategory={handleDeleteCategory}
         onOpenQuickAddType={handleOpenDirectType}
         onOpenDriveModal={() => setIsDriveModalOpen(true)}
-        onOpenDeviceSyncModal={() => setIsDeviceSyncModalOpen(true)}
         onSyncWithDrive={handleManualSyncWithDrive}
         isSyncing={isSyncingDrive}
+        isMobileViewer={isMobile}
+        isSearchOpen={isSearchOpen}
+        onToggleSearch={() => setIsSearchOpen(!isSearchOpen)}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
       />
 
       {/* Top-Left Controls: Theme Toggle + Zoom Controls (keeps bottom clean for dock pill) */}
@@ -1145,34 +1178,7 @@ export default function Home() {
         onConnectDrive={(connected) => setIsDriveConnected(connected)}
       />
 
-      <DeviceSyncModal
-        isOpen={isDeviceSyncModalOpen}
-        onClose={() => setIsDeviceSyncModalOpen(false)}
-        nodes={nodes}
-        categories={categories}
-        viewport={viewport}
-        activeCategory={activeCategory}
-        onRestoreBoard={async (restoredNodes, restoredCategories, restoredViewport) => {
-          // Replace local Dexie DB content with the synced cloud board
-          await db.nodes.clear();
-          for (const n of restoredNodes) {
-            await db.nodes.put(n);
-          }
-          if (restoredCategories && restoredCategories.length > 0) {
-            await db.categories.clear();
-            for (const c of restoredCategories) {
-              await db.categories.put(c);
-            }
-            setCategories(restoredCategories);
-          }
-          setNodes(restoredNodes);
-          if (restoredViewport) {
-            setViewport(restoredViewport);
-          } else {
-            centerCanvasOnNodes(restoredNodes);
-          }
-        }}
-      />
+      
     </div>
   );
 }
