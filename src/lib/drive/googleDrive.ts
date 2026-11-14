@@ -38,13 +38,16 @@ export function getStoredAccessToken(): string | null {
   return activeAccessToken || localStorage.getItem('gdrive_access_token');
 }
 
-export function setStoredAccessToken(token: string | null) {
+export function setStoredAccessToken(token: string | null, expiresInSeconds?: number) {
   activeAccessToken = token;
   if (typeof window !== 'undefined') {
     if (token) {
       localStorage.setItem('gdrive_access_token', token);
+      const expiry = Date.now() + (expiresInSeconds ? expiresInSeconds * 1000 : 3600 * 1000);
+      localStorage.setItem('gdrive_token_expires_at', expiry.toString());
     } else {
       localStorage.removeItem('gdrive_access_token');
+      localStorage.removeItem('gdrive_token_expires_at');
     }
   }
 }
@@ -58,13 +61,51 @@ export function handleOAuthRedirectResponse(): boolean {
 
   const hashParams = new URLSearchParams(window.location.hash.substring(1));
   const token = hashParams.get('access_token');
+  const expiresIn = hashParams.get('expires_in');
   if (token) {
-    setStoredAccessToken(token);
+    const sec = expiresIn ? parseInt(expiresIn, 10) : 3600;
+    setStoredAccessToken(token, sec);
     // Clean up hash from address bar
     window.history.replaceState(null, '', window.location.pathname + window.location.search);
     return true;
   }
   return false;
+}
+
+/**
+ * Attempts silent background token refresh without prompting user if session exists
+ */
+export async function refreshGoogleDriveTokenSilently(clientId?: string): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  const activeClientId = clientId || localStorage.getItem('gdrive_client_id') || DEFAULT_CLIENT_ID;
+
+  if (!window.google?.accounts?.oauth2) {
+    return null;
+  }
+
+  return new Promise((resolve) => {
+    try {
+      const client = window.google.accounts.oauth2.initTokenClient({
+        client_id: activeClientId.trim(),
+        scope: DRIVE_FILE_SCOPE,
+        callback: (response: any) => {
+          if (response?.access_token) {
+            setStoredAccessToken(response.access_token, response.expires_in ? parseInt(response.expires_in, 10) : 3600);
+            resolve(response.access_token);
+          } else {
+            resolve(null);
+          }
+        },
+        error_callback: () => {
+          resolve(null);
+        },
+      });
+      // Silent refresh request with prompt: 'none'
+      client.requestAccessToken({ prompt: 'none' });
+    } catch {
+      resolve(null);
+    }
+  });
 }
 
 /**
@@ -82,7 +123,6 @@ export function redirectToGoogleOAuth(clientId: string) {
       response_type: 'token',
       scope: DRIVE_FILE_SCOPE,
       include_granted_scopes: 'true',
-      prompt: 'consent',
     }).toString();
 
   window.location.href = authUrl;
@@ -129,7 +169,7 @@ export function requestGoogleDriveAuth(clientId: string): Promise<string> {
           }
           if (response.access_token) {
             resolved = true;
-            setStoredAccessToken(response.access_token);
+            setStoredAccessToken(response.access_token, response.expires_in ? parseInt(response.expires_in, 10) : 3600);
             resolve(response.access_token);
           } else {
             resolved = true;

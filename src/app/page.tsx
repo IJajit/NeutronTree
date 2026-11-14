@@ -16,6 +16,7 @@ import {
   trashCategoryOnGoogleDrive,
   renameCategoryOnGoogleDrive,
   handleOAuthRedirectResponse,
+  refreshGoogleDriveTokenSilently,
   pullNodesFromGoogleDrive,
   syncBoardStateToDrive,
   pullBoardStateFromDrive,
@@ -150,13 +151,22 @@ export default function Home() {
       }
 
       // Check live Drive connection token
-      const isConnected = connectedFromRedirect || Boolean(getStoredAccessToken());
+      let isConnected = connectedFromRedirect || Boolean(getStoredAccessToken());
+
+      // If token is expired or absent, attempt silent background refresh using Google GIS session
+      if (!isConnected && typeof window !== 'undefined' && localStorage.getItem('gdrive_client_id')) {
+        const refreshedToken = await refreshGoogleDriveTokenSilently();
+        if (refreshedToken) {
+          isConnected = true;
+        }
+      }
+
       setIsDriveConnected(isConnected);
 
-      // Register handler for expired 401 tokens
+      // Register handler for expired 401 tokens:
+      // Silently set connected to false, but DO NOT pop open the modal automatically
       setAuthErrorHandler(() => {
         setIsDriveConnected(false);
-        setIsDriveModalOpen(true);
       });
 
       // If Google Drive is connected, non-destructively pull/sync cards from cloud
