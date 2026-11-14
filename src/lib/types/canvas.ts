@@ -33,6 +33,10 @@ export interface BlockNode {
     aspectRatio?: number;
     colorAccent?: string;
     rawFileBase64?: string;
+    fontSize?: 'small' | 'medium' | 'large' | 'extra-large' | number;
+    isBold?: boolean;
+    isList?: boolean;
+    color?: string;
   };
 }
 

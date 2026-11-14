@@ -749,7 +749,7 @@ export const CategoryDock: React.FC<CategoryDockProps> = ({
             <button
               onClick={() => onOpenQuickAddType('note')}
               className="glass-circle-btn touch-manipulation"
-              title="Add Note"
+              title="Add Freeform Text (T)"
             >
               <Type className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
             </button>

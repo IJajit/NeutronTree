@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, initializeDbDefaults } from '@/lib/db/localDb';
 import { BlockNode, Category, ViewportState, MediaType } from '@/lib/types/canvas';
 import { BlockCard } from '@/components/cards/BlockCard';
+import { FreeformTextBlock } from '@/components/cards/FreeformTextBlock';
 import { CategoryDock } from '@/components/canvas/CategoryDock';
 import { Minimap } from '@/components/canvas/Minimap';
 import { QuickAddModal } from '@/components/modals/QuickAddModal';
@@ -969,8 +970,8 @@ export default function Home() {
       type,
       x: screenCenterX - 170 + (Math.random() * 40 - 20),
       y: screenCenterY - 120 + (Math.random() * 40 - 20),
-      width: type === 'link' || type === 'image' ? 360 : 340,
-      height: type === 'note' ? 220 : 280,
+      width: type === 'note' ? 380 : type === 'link' || type === 'image' ? 360 : 340,
+      height: type === 'note' ? 60 : 280,
       category,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -1146,6 +1147,25 @@ export default function Home() {
           })();
 
           const isSelected = selectedNodeId === node.id || selectedNodeIds.has(node.id);
+          const handleSelectNode = (e: React.MouseEvent | React.TouchEvent) => {
+            e.stopPropagation();
+            // If the user was panning or dragging on touch, do not trigger card selection
+            if (touchMovedDistanceRef.current > 6) {
+              return;
+            }
+            setSelectedNodeId(node.id);
+            if ('shiftKey' in e && e.shiftKey) {
+              setSelectedNodeIds((prev) => {
+                const next = new Set(prev);
+                if (next.has(node.id)) next.delete(node.id);
+                else next.add(node.id);
+                return next;
+              });
+            } else {
+              setSelectedNodeIds(new Set([node.id]));
+            }
+          };
+
           return (
             <div
               key={node.id}
@@ -1159,33 +1179,29 @@ export default function Home() {
                 zIndex: isSelected ? 30 : 1,
               }}
             >
-              <BlockCard
-                node={node}
-                categories={categories}
-                isSelected={isSelected}
-                onSelect={(e) => {
-                  e.stopPropagation();
-                  // If the user was panning or dragging on touch, do not trigger card selection
-                  if (touchMovedDistanceRef.current > 6) {
-                    return;
-                  }
-                  setSelectedNodeId(node.id);
-                  if (e.shiftKey) {
-                    setSelectedNodeIds((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(node.id)) next.delete(node.id);
-                      else next.add(node.id);
-                      return next;
-                    });
-                  } else {
-                    setSelectedNodeIds(new Set([node.id]));
-                  }
-                }}
-                onDelete={handleDeleteNode}
-                onUpdate={handleUpdateNode}
-                onStartDrag={handleStartDragNode}
-                onTouchStartDrag={handleStartDragNodeTouch}
-              />
+              {node.type === 'note' ? (
+                <FreeformTextBlock
+                  node={node}
+                  isSelected={isSelected}
+                  onSelect={handleSelectNode}
+                  onDelete={handleDeleteNode}
+                  onUpdate={handleUpdateNode}
+                  onStartDrag={handleStartDragNode}
+                  onTouchStartDrag={handleStartDragNodeTouch}
+                  zoom={viewport.zoom}
+                />
+              ) : (
+                <BlockCard
+                  node={node}
+                  categories={categories}
+                  isSelected={isSelected}
+                  onSelect={handleSelectNode}
+                  onDelete={handleDeleteNode}
+                  onUpdate={handleUpdateNode}
+                  onStartDrag={handleStartDragNode}
+                  onTouchStartDrag={handleStartDragNodeTouch}
+                />
+              )}
             </div>
           );
         })}

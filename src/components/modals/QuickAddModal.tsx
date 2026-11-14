@@ -68,8 +68,9 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
           thumbnailUrl: data.image || '',
         });
       } else if (tab === 'note') {
-        onAdd('note', title || 'Field Note', selectedCat, {
+        onAdd('note', 'Text Block', selectedCat, {
           content: noteContent,
+          fontSize: 'medium',
         });
       } else if (tab === 'image') {
         onAdd('image', title || fileActualName || 'Inspiration Snapshot', selectedCat, {
@@ -170,7 +171,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
               className={`filter-pill ${tab === 'note' ? 'active' : ''}`}
               style={{ color: tab === 'note' ? '#ffffff' : '#888' }}
             >
-              <Type className="w-3.5 h-3.5" /> Note
+              <Type className="w-3.5 h-3.5" /> Text
             </button>
             <button
               type="button"
@@ -290,50 +291,32 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
           )}
 
           {tab === 'note' && (
-            <>
-              <div>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Title..."
-                  style={{
-                    width: '100%',
-                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    borderRadius: '12px',
-                    padding: '12px 14px',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    color: '#ededed',
-                    outline: 'none',
-                  }}
-                  autoFocus
-                />
-              </div>
-              <div>
-                <textarea
-                  required
-                  rows={6}
-                  value={noteContent}
-                  onChange={(e) => setNoteContent(e.target.value)}
-                  placeholder="Type notes..."
-                  style={{
-                    width: '100%',
-                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    borderRadius: '12px',
-                    padding: '12px 14px',
-                    fontSize: '13px',
-                    color: '#ededed',
-                    outline: 'none',
-                    resize: 'vertical',
-                    lineHeight: '1.65',
-                    minHeight: '140px',
-                  }}
-                />
-              </div>
-            </>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: '#aaaaaa', marginBottom: '8px', fontWeight: 500 }}>
+                Text Content
+              </label>
+              <textarea
+                required
+                rows={5}
+                value={noteContent}
+                onChange={(e) => setNoteContent(e.target.value)}
+                placeholder="Type anything freely..."
+                style={{
+                  width: '100%',
+                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  borderRadius: '12px',
+                  padding: '12px 14px',
+                  fontSize: '14px',
+                  color: '#ededed',
+                  outline: 'none',
+                  resize: 'vertical',
+                  lineHeight: '1.6',
+                  minHeight: '120px',
+                }}
+                autoFocus
+              />
+            </div>
           )}
 
           {tab === 'image' && (
